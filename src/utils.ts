@@ -1,6 +1,6 @@
 export function tableToArray<T extends { id: string }>(
   table: Table<T>,
-  skipDefault?: boolean
+  skipDefault: boolean=false
 ): T[] {
   const arr: T[] = [];
   table.each(function (row) {

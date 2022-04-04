@@ -65,7 +65,8 @@ getBarAttributes = function (sheet) {
   log(sheet.id());
   if (['main', 'monster'].includes(sheet.id())) {
     // limits the code to the cases where it's a character being dropped onto the scene, as opposed to a craft for example.
-    let stats = {
+
+    let stats: ReturnType<typeof getBarAttributes> = {
       [_('Health')]: ['hp', 'hpmax'],
     };
     return stats;
@@ -230,20 +231,18 @@ const initRaceLabel = function (sheet: Sheet) {
 };
 
 const initSkills = function (sheet: Sheet) {
-  Tables.get('skills').each(function (skill) {
-    sheet.get(skill.id).on('click', function () {
+  Tables.get('skills').each((skill) => {
+    sheet.get(skill.id)?.on('click', function () {
       const data = sheet.getData();
-      let pct = sheet.get<number>(''.concat(skill.id, '_pct')).value() || 0;
+      let pct = sheet.get<number>(''.concat(skill.id, '_pct'))?.value() || 0;
       if (skill.section === 'universal') {
-        const trained = data[''.concat(skill.id, '_isTrained')];
+        const trained = data[`${skill.id}_isTrained`];
         if (!trained) {
           const stats = skill.stats.split(',');
           pct =
             Math.min.apply(
               undefined,
-              stats.map(function (statId) {
-                return data[statId];
-              })
+              stats.map((statId) => data[statId])
             ) || 0;
         }
       } else if (pct === 0) {
