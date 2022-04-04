@@ -1,10 +1,10 @@
 // write your custom scripts here
 
-import { tableToArray, toMap } from './utils';
+// import { tableToArray, toMap } from './utils';
 
-const attributes = tableToArray(Tables.get('attribute_list'));
+// const attributes = tableToArray(Tables.get('attribute_list'));
 
-const attributesMap = toMap(attributes, 'id');
+// const attributesMap = toMap(attributes, 'id');
 
 // const modifiedComponentIDs = {};
 

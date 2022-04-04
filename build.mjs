@@ -3,13 +3,34 @@ import babel from '@babel/core';
 import fs from 'fs/promises';
 
 try {
-  const { outputFiles } = await esbuild.build({
+  const result = await esbuild.build({
     entryPoints: ['src/index.ts'],
     bundle: true,
     outfile: 'build/index.js',
     format: 'esm',
     write: false,
+    watch: {
+      async onRebuild(error, result) {
+        if (error) console.error('watch build failed:', error);
+        else {
+          await transpileBuild(result);
+          console.log('watch build succeeded');
+        }
+      },
+    },
   });
+  await transpileBuild(result);
+  console.log('Initial Build')
+} catch (error) {
+  console.error(error);
+  process.exit(1);
+}
+
+/**
+ *
+ * @param {esbuild.BuildResult}
+ */
+async function transpileBuild({ outputFiles }) {
   for (const { path, contents } of outputFiles) {
     const raw = new TextDecoder().decode(contents);
 
@@ -31,7 +52,4 @@ try {
       await fs.writeFile(path, raw, { flag: 'w' });
     }
   }
-} catch (error) {
-  console.error(error);
-  process.exit(1);
 }
