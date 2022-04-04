@@ -1,0 +1,25 @@
+{
+  "name": "hackmaster-lets-role",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node build.mjs",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZachHaber/hackmaster-lets-role.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ZachHaber/hackmaster-lets-role/issues"
+  },
+  "homepage": "https://github.com/ZachHaber/hackmaster-lets-role#readme",
+  "devDependencies": {
+    "@babel/core": "^7.17.8",
+    "esbuild": "^0.14.30",
+    "typescript": "^4.6.3"
+  }
+}
