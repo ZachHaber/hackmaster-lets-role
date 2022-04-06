@@ -1,7 +1,5 @@
 declare type Attributes = 'str' | 'dex' | 'int' | 'wis' | 'lks' | 'cha' | 'con';
 
-declare type DiceVisibility = 'all' | 'gm' | 'gmonly';
-
 declare interface Attribute {
   id: Attributes;
   label: string;
@@ -81,24 +79,69 @@ declare class Table<T> {
   random(cb: (line: T) => void): void;
 }
 
+declare interface SheetData extends Record<string, ComponentValue> {
+  uid: string;
+}
+
 declare class Sheet {
   /** Get a component by its id */
   get<T extends ComponentValue>(id: string): Component<T> | null;
   /** Get a variable's value by its id */
   getVariable(id: string): string | number | null;
-  /** Get the id of the sheet */
+
+  /** Get the id of the sheet (the id of the top view component) */
   id(): string;
+  /** The unique ID of the sheet (ie a sheet creation order index on Let's Role). Used to distinguish a leaf from another leaf of the same type */
+  getSheetId(): number;
   /** Get the name of the sheet */
   name(): string;
-  /** Prompt the user for additional information */
-  prompt(title: string, view: string, callback: any): void;
-  /** Set multiple components values at the same time. */
-  setData(data: any): void;
+  /** Prompt the user for additional information
+   * The Prompt API allows you to ask the user to fill a small form before an action For example, if you need a modifier before a dice roll, you can prompt a small pop-in asking the modifier's value.
+   *
+   * The prompt itself consists of a title, a view's id, and a callback with the data colected form the view The view is initialized in the global {@link init}(sheet) function.
+   *
+   * @param title The title of the prompt window
+   * @param view The id of the view to use
+   * @param callback The callback to get the data once the user clicks the "next" button. The first argument is the view's data.
+   * @param callbackInit The callback called when opening the prompt which allows to modify elements of the prompt view from information coming from the sheet which calls `sheet.prompt(...)`
+   * @example
+    sheet.get('attack')?.on('click', () => {
+      sheet.prompt(
+        'Modifiers ?',
+        // rollprompt is the id of the view
+        'rollPrompt',
+        (result) => {
+          // result is an object of the data of the view
+          // after the user clicks "next" or "continue"
+          // if the user cancels the prompt, this function is not called
+          if (result.advantage) {
+            Dice.roll(sheet, `keeph(2d20) + ${result.promptModifier}`);
+          } else {
+            Dice.roll(sheet, `1d20 + ${result.promptModifier}`);
+          }
+        },
+        (promptView) => {
+          // the callbackInit function can access the sheet which calls the prompt and the prompt sheet
+          // dexModifier is on the character sheet
+          const dexModifier = sheet.get('dexModifier')?.value() || 0;
+          // promptModifier is on the prompt sheet
+          promptView.get('promptModifier')?.value(dexModifier);
+        }
+      );
+    });
+   */
+  prompt(
+    title: string,
+    view: string,
+    callback: (data: SheetData) => void,
+    callbackInit?: (view: Sheet) => void
+  ): void;
+  /** Set multiple sheet data at once (including components values).
+   *
+   * You can only set __20__ values at a time. */
+  setData(data: Partial<SheetData>): void;
 
-  getData(): record<string, ComponentValue> & {
-    skillDifficulty: string;
-    diceVisibility: DiceVisibility;
-  };
+  getData(): SheetData;
 }
 
 declare class Component<T = ComponentValue> {
@@ -222,16 +265,150 @@ log(hp.rawValue()); // 17
 
 type EventType = 'click' | 'update' | 'mouseenter' | 'mouseleave' | 'keyup';
 
-type ComponentValue = null | number | string | object;
+type ComponentValue = undefined | null | number | string | object | boolean;
 
+/// Global!
+/**
+ * Initialize a sheet, as a character sheet or a craft. You can see what type of sheet it is via {@link Sheet.id}
+ * 
+ * Table entries are not initialized individually, and should be initialized as if they were part of the parent view.
+ * 
+ * @example
+  init = (sheet) => {
+    if (sheet.id() === 'main') {
+      initMain(sheet);
+    } else if (sheet.id() === 'weapon') {
+      initWeapon(sheet);
+    }
+  };
+  // initialize the main sheet
+  const initMain = (sheet: Sheet) => {
+    const hp = sheet.get('hp');
+    // ...
+  };
+  // Initialize a weapon sheet
+  const initWeapon = (sheet: Sheet) => {
+    const damage = sheet.get('damage');
+    // ...
+  };
+
+ */
 declare let init: (sheet: Sheet) => void;
+
+/**
+ * Called when dropping a craft onto a character sheet.
+ * If you simply want to append the data to a repeater, return the repeater's id. Otherwise you'll have to manipulate the target sheet data.
+ * 
+ * For now, it is only possible to drop crafts into character sheets.
+ * @example
+  drop = (from, to) => from.id() === 'weapon' && to.id() === 'main' ? 'weapons' : undefined;
+ * @example
+  drop = (from, to) => {
+    if (from.id() === 'heal' && to.id() === 'main') {
+      // set the target's hp to the source maxhp
+      to.get('hp')?.value(from.get('maxhp')?.value());
+    }
+  };
+ * @param from Source Sheet
+ * @param to Target's Sheet
+ */
+declare let drop: (from: Sheet, to: Sheet) => void | string;
+
+/**
+ * For some systems, it can be useful to drag'n'drop a dice result onto the sheet
+ * 
+ * With this function, you can create interaction between the dice log and a character sheet or craft.
+ * @param result A dice result from the dice log
+ * @param to Target's sheet
+ * @example
+  dropDice = (result, sheet) => {
+    if (result.containsTag('heal')) {
+      let hp = sheet.get('hp');
+      // the character is healed by the total of the roll
+      hp?.value(hp.value() + result.total);
+    }
+  };
+ */
+
+declare let dropDice: (result: DiceResult, to: Sheet) => void;
+
+/**
+ *
+ *
+ * This function allows you to customize the rendering of a dice
+ * @param view the id of the view you want to render the dice result
+ * @param onRender: A function called when rendering the view, where you can change view values. Please note the view is also initialized in the global `init` function.
+ */
+declare type InitRollCallback = (
+  view: string,
+  onRender: (sheet: Sheet) => void
+) => void;
+
+/**
+ * This function allows you to customize the rendering of the dice result
+ * @param result A dice result from the dice log
+ * @param {InitRollCallback} callback A callback to render the dice result.
+ * @example
+  initRoll = (result, callback) => {
+    // diceresult is the id of the view you want to use
+    callback('diceresult', (sheet) => {
+      // apply various changes to the view
+      sheet.get('total')?.text(result.total);
+      if (result.total > 20) {
+        sheet.get('toal')?.addClass('text-large');
+      }
+    });
+  };
+ */
+declare type InitRollFunction = (
+  result: DiceResult,
+  callback: InitRollCallback
+) => void | boolean;
+/**
+ * This function allows you to customize the rendering of the dice result
+ * @param result A dice result from the dice log
+ * @param {InitRollCallback} callback A callback to render the dice result.
+ * @example
+  initRoll = (result, callback) => {
+    // diceresult is the id of the view you want to use
+    callback('diceresult', (sheet) => {
+      // apply various changes to the view
+      sheet.get('total')?.text(result.total);
+      if (result.total > 20) {
+        sheet.get('toal')?.addClass('text-large');
+      }
+    });
+  };
+ */
+declare let initRoll: InitRollFunction;
+/**
+ * Players can connect bars to some attributs with this method. it is required to have a value, and a maximum value.
+ *
+ * The bar updates when the sheet is changes, and the sheet updates when the bar is changed.
+ *
+ * @returns Object with `[min:string,max:string]`
+ * @example
+  getBarAttributes = (sheet) => {
+    const hp = ['hp', 'hpmax'] as const;
+    if (sheet.id() === 'main') {
+      return {
+        HP: hp,
+        'Quick Resource': ['quickResource', 'quickResourceMax'],
+      };
+    }
+    if (sheet.id() === 'monster') {
+      return {
+        HP: hp,
+        // You can use numbers directly for maximums
+        Mana: ['mana', 30],
+      };
+    }
+    return {};
+  };
+ */
 declare let getBarAttributes: (
   sheet: Sheet
-) => Record<string, string[]> | undefined;
-
-declare function _(string: string): string;
-
-declare function log(...data: any[]): void;
+) => Record<string, readonly [string, string | number] | undefined>;
 
 /**
  * Bindings allow players to reference an element of their character sheet in the chat. With this API, you have full control over what bindings are available, and how they are displayed.
@@ -319,4 +496,129 @@ declare const Dice: {
   ): void;
 };
 
-type DiceValue = string | number | DiceBuilder;
+declare type DiceValue = string | number | DiceBuilder;
+
+declare type DiceVisibility = 'all' | 'gm' | 'gmonly';
+declare type DiceType = 'number' | 'dice' | 'comparison';
+
+declare interface SingleDiceResult {
+  /** The number of faces of the dice */
+  dimension: number;
+  /** The rolled number */
+  value: number;
+  /** is this roll discarded? (for example when using `keeph`) */
+  discarded: boolean;
+}
+
+declare interface BaseTopDiceResult {
+  /** Only available in the top result. */
+  title: string;
+  /** Only available in the top result. */
+  expression: string;
+  /** The visibility of the current roll. Only available in the top result */
+  visibility: DiceVisibility;
+}
+
+declare interface BaseDiceResult {
+  /** The type of the current roll. */
+  type: DiceType;
+  /** * For a `'dice'` roll: the total value of the rolls
+   *  * For a `'number'` roll: the result of the operation
+   *  * For a `'comparison'` roll: the number of successes
+   */
+  total: number;
+  /** Get the tags for the current roll. If you want all the tags, include in the children, use {@link allTags} */
+  tags: string[];
+  /** Get the tags, including the ones in the children */
+  allTags: string[];
+  /** Get all the results of the rolled dice, including in the children */
+  all: SingleDiceResult[];
+  /** Get the children of the curent roll */
+  children: DiceResultChild[];
+  /**
+   * Checks if the current roll or any of its children contains this tag
+   * @param tag The tag to lookup
+   */
+  containsTag(tag: string): boolean;
+}
+
+declare interface DiceResultDice extends BaseDiceResult {
+  type: 'dice';
+  /** The number of rolled dice. For example, 3d6, returns 3. Returns null if the roll is not of type `dice` */
+  size: number;
+  /** The dimension of the dice For example 3d6 returns 6. Returns null if the roll is not of type `dice` */
+  dimension: number;
+  /** The results of the roll. Does not include the discarded values. Returns null if the roll is not of type `dice` */
+  values: number[];
+  /** The discarded results of the roll Returns null if the roll is not of type `dice` */
+  discarded: number[];
+}
+declare interface DiceResultComparison extends BaseDiceResult {
+  type: 'comparison';
+  /** The left part of the comparison. Returns null if the roll is not of type `comparison` */
+  left: DiceResultChild[];
+  /** The right part of the comparison. Returns null if the roll is not of type `comparison` */
+  right: DiceResultChild[];
+  /** The number of successes of the comparison. Returns null if the roll is not of type `comparison` */
+  success: number;
+  /** The number of failures of the comparison. Returns null if the roll is not of type `comparison` */
+  failure: number;
+}
+declare type DiceResultNumber = BaseDiceResult & { type: 'number' };
+declare type DiceResultChild =
+  | DiceResultComparison
+  | DiceResultDice
+  | DiceResultNumber;
+declare type DiceResult = DiceResultChild & BaseTopDiceResult;
+
+// Utilities
+/** Log variables to the console */
+declare function log(...data: any[]): void;
+
+/**
+ * Call a function after a wait time
+ * @param ms Duration in miliseconds to wait
+ * @param callback The function to call when the timer is done.
+ */
+declare function wait(ms: number, callback: () => void): void;
+
+/**
+ * Converts any value to an integer
+ * @param value The value to convert
+ */
+declare function parseInt(value: any): number;
+
+/**
+ * Translate a message to the current locale.
+ * @param text The text to translate.
+ */
+declare function _(text: string): string;
+
+/**
+ * Iterates over an object or array
+ * @param collection The data to iterate over
+ * @param iterator The function called for each element in the data Return `false` if you want to stop the iteration. The first argument is the item, the second is the index.
+ * @example
+ * const animals = {
+ *    cat: 'Meow',
+ *    dog: 'Woof',
+ *    bird: 'Chirp'
+ * };
+ * each(animals, (noise, type)=>log(noise));
+ */
+function each<T>(
+  collection: T[],
+  iterator: (item: T, index: number) => void | false
+);
+function each<T extends object>(
+  collection: T,
+  iterator: (item: T[keyof T], key: keyof T) => void | false
+);
+function each<T>(
+  collection: Table<T>,
+  iterator: (item: T, id: string) => void | false
+);
+function each(
+  collection: string,
+  iterator: (char: string, index: number) => void | false
+);
