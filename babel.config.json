@@ -1,0 +1,12 @@
+{
+  "plugins": [
+    "@babel/plugin-transform-arrow-functions",
+    "@babel/plugin-proposal-optional-chaining",
+    "@babel/plugin-transform-template-literals",
+    "@babel/plugin-transform-computed-properties",
+    "@babel/plugin-transform-parameters",
+    "@babel/plugin-transform-regenerator"
+    // "@babel/plugin-transform-runtime"
+  ],
+  "presets": ["@babel/preset-typescript"]
+}

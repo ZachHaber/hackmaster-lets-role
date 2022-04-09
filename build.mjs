@@ -1,15 +1,21 @@
 import esbuild from 'esbuild';
 import babel from '@babel/core';
-import fs from 'fs/promises';
+import fs from 'fs-extra';
+import { argv } from 'process';
+import path from 'path';
+
+const isBuild = argv.some((arg) => ['-b', '--build'].includes(arg));
+const isWatch = argv.some((arg) => ['-w', '--watch'].includes(arg));
 
 try {
   const result = await esbuild.build({
     entryPoints: ['src/index.ts'],
     bundle: true,
-    outfile: 'build/index.js',
+    outdir: 'build',
     format: 'esm',
     write: false,
-    watch: {
+    minify: isBuild,
+    watch: isWatch && {
       async onRebuild(error, result) {
         if (error) console.error('watch build failed:', error);
         else {
@@ -20,7 +26,7 @@ try {
     },
   });
   await transpileBuild(result);
-  console.log('Initial Build')
+  console.log('Initial Build');
 } catch (error) {
   console.error(error);
   process.exit(1);
@@ -31,25 +37,21 @@ try {
  * @param {esbuild.BuildResult}
  */
 async function transpileBuild({ outputFiles }) {
-  for (const { path, contents } of outputFiles) {
+  for (const { path: filePath, contents } of outputFiles) {
     const raw = new TextDecoder().decode(contents);
-
-    if (path.endsWith('.js')) {
+    await fs.ensureDir(path.dirname(filePath));
+    if (filePath.endsWith('.js')) {
       const res = await babel.transformAsync(raw, {
-        plugins: [
-          '@babel/plugin-transform-arrow-functions',
-          '@babel/plugin-proposal-optional-chaining',
-          '@babel/plugin-transform-template-literals',
-          '@babel/plugin-transform-computed-properties',
-          '@babel/plugin-transform-parameters',
-        ],
+        minified: isBuild,
+        configFile: true,
+        filename: path.basename(filePath),
       });
-      await fs.writeFile(path, res.code.replaceAll('void 0', 'undefined'), {
+      await fs.writeFile(filePath, res.code.replaceAll('void 0', 'undefined'), {
         flag: 'w',
       });
     } else {
       // don't run css through babel
-      await fs.writeFile(path, raw, { flag: 'w' });
+      await fs.writeFile(filePath, raw, { flag: 'w' });
     }
   }
 }
