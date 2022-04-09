@@ -480,7 +480,9 @@ declare class DiceBuilder {
   expladd(...explode: number[]): DiceBuilder;
   mul(multiplier: number): DiceBuilder;
   reroll(...reroll: number[]): DiceBuilder;
-  rerolln(...reroll: number[], max: number): DiceBuilder;
+  rerolln<T extends number>(
+    ...args: [...reroll: T[], max: number]
+  ): DiceBuilder;
   ternary(then: DiceValue, elseValue: DiceValue): DiceBuilder;
   toString(): string;
 }

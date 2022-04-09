@@ -108,9 +108,6 @@ const initRaceLabel = function (sheet: Sheet) {
 };
 
 const initSkills = function (sheet: Sheet) {
-  // for (const val of generator()) {
-  //   log(val);
-  // }
   Tables.get('skills').each((skill) => {
     sheet.get(skill.id)?.on('click', function () {
       const data = sheet.getData();
@@ -155,9 +152,3 @@ const initSkills = function (sheet: Sheet) {
 };
 
 //endregion
-
-// function* generator() {
-//   yield 2;
-//   yield 1;
-//   return 5;
-// }
