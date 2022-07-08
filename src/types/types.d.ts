@@ -169,24 +169,37 @@ declare class Component<T = ComponentValue> {
 
   /**
    *
-   * @param event
-   * @param delegate Subcomponent to delegate the event to.
+   * @param event The name of the event. Possible values : click, update, mouseenter, mouseleave, keyup
    * @param callback The function to call when the event is triggered. The first argument is the event.
    *
    * If the event is triggered from code, it will have the property `computed` to `true`. It’s possible to delegate events to a subcomponent, useful when using repeaters. It’s only possible to have one event of the same type for a component at once.
    */
   on(event: EventType, callback: (event: any) => void): void;
+  /**
+   *
+   * @param event The name of the event. Possible values : click, update, mouseenter, mouseleave, keyup
+   * @param delegate Subcomponent to delegate the event to.
+   * @param callback The function to call when the event is triggered. The first argument is the event.
+   *
+   * If the event is triggered from code, it will have the property `computed` to `true`. It’s possible to delegate events to a subcomponent, useful when using repeaters. It’s only possible to have one event of the same type for a component at once.
+   */
   on(event: EventType, delegate: string, callback: (event: any) => void): void;
 
   /**
    *
    * @param event
-   * @param delegate  Subcomponent to delegate the event to.
    *
    * Remove an event on the component or one of its delegates.
    */
   off(event: EventType): void;
-  off(event: EventType, delegate): void;
+  /**
+   *
+   * @param event The name of the event. Possible values : click, update, mouseenter, mouseleave, keyup
+   * @param delegate  Subcomponent to delegate the event to.
+   *
+   * Remove an event on the component or one of its delegates.
+   */
+  off(event: EventType, delegate: string): void;
 
   /** Hide the component */
   hide(): void;
@@ -420,7 +433,7 @@ A binding is created with 4 elements :
 - viewId : the id of the view used to display the binding
 - data `Function` : a function that returns an object of data passed to the view for rendering. This data will be available in the view
  */
-class Binding {
+declare class Binding {
   /**
    *
    * @param name The name used in the chat
@@ -433,8 +446,8 @@ class Binding {
     name: string,
     componentId: string,
     viewId: string,
-    dataCallback: () => object
-  );
+    dataCallback?: () => object
+  ): void;
 
   /**
    *
@@ -462,7 +475,7 @@ class Binding {
 declare const Bindings: Binding;
 
 declare class DiceBuilder {
-  constructor(input: DiceValue): DiceBuilder;
+  constructor(input: DiceValue);
   add(value: DiceValue): DiceBuilder;
   minus(value: DiceValue): DiceBuilder;
   multiply(value: DiceValue): DiceBuilder;
@@ -608,19 +621,19 @@ declare function _(text: string): string;
  * };
  * each(animals, (noise, type)=>log(noise));
  */
-function each<T>(
+declare function each<T>(
   collection: T[],
   iterator: (item: T, index: number) => void | false
-);
-function each<T extends object>(
+): void;
+declare function each<T extends object>(
   collection: T,
   iterator: (item: T[keyof T], key: keyof T) => void | false
-);
-function each<T>(
+): void;
+declare function each<T>(
   collection: Table<T>,
   iterator: (item: T, id: string) => void | false
-);
-function each(
+): void;
+declare function each(
   collection: string,
   iterator: (char: string, index: number) => void | false
-);
+): void;

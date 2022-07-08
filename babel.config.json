@@ -7,7 +7,10 @@
     "@babel/plugin-transform-computed-properties",
     "@babel/plugin-transform-parameters",
     "@babel/plugin-transform-for-of",
-    "@babel/plugin-transform-destructuring"
+    "@babel/plugin-transform-destructuring",
+    "./plugins/inOperator.mjs",
+    "./plugins/symbolCheck.mjs",
+    "./plugins/void.mjs"
   ],
   "presets": ["@babel/preset-typescript"]
 }

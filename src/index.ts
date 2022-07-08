@@ -69,13 +69,11 @@ init = function (sheet) {
 // };
 
 getBarAttributes = function (sheet) {
+  const stats: ReturnType<typeof getBarAttributes> = {};
   // [triggered when dropping a token onto a scene] adds options to the "Connect to" dropdown menu. The selected field will be displayed as a dynamic gauge on the token
   if ([sheets.main, sheets.monster].includes(sheet.id())) {
     // limits the code to the cases where it's a character being dropped onto the scene, as opposed to a craft for example.
-
-    let stats: ReturnType<typeof getBarAttributes> = {
-      [_('Health')]: ['hp', 'hpmax'],
-    };
+    stats[_('Health')] = ['hp', 'hpmax'];
     return stats;
   }
   return {};

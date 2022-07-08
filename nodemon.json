@@ -1,0 +1,5 @@
+{
+  "restartable": "rs",
+  "watch": ["build.mjs", "babel.config.json", "plugins/**"],
+  "ext": "js,mjs,json,ts"
+}

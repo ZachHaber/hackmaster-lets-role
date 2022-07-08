@@ -46,7 +46,7 @@ async function transpileBuild({ outputFiles }) {
         configFile: true,
         filename: path.basename(filePath),
       });
-      await fs.writeFile(filePath, res.code.replaceAll('void 0', 'undefined'), {
+      await fs.writeFile(filePath, res.code, {
         flag: 'w',
       });
     } else {

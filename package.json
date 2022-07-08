@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node build.mjs -w",
+    "start": "nodemon build.mjs -- -w",
     "start:babel": "babel src -w --out-dir lib --extensions \".ts\"",
     "build": "node build.mjs -b",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -28,6 +28,7 @@
     "@babel/preset-typescript": "^7.16.7",
     "esbuild": "^0.14.30",
     "fs-extra": "^10.0.1",
+    "nodemon": "^2.0.19",
     "typescript": "^4.6.3"
   },
   "dependencies": {
