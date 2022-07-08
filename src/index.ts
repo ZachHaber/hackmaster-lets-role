@@ -28,8 +28,8 @@ init = function (sheet) {
     initSkills(sheet);
     // let values = sheet.getData().diceVisibility;
     // log(values)
-    // log("Finished initializing sheet. Have fun!");
   }
+  log('Finished initializing sheet. Have fun!');
 };
 
 // initRoll = function (result, callback) {
@@ -150,3 +150,13 @@ const initSkills = function (sheet: Sheet) {
 };
 
 //endregion
+
+for (const val of generator()) {
+  log(val);
+}
+
+function* generator() {
+  yield 2;
+  yield 1;
+  return 5;
+}

@@ -1,5 +1,6 @@
 {
   "plugins": [
+    "babel-plugin-lite-regenerator",
     "@babel/plugin-transform-arrow-functions",
     "@babel/plugin-proposal-optional-chaining",
     "@babel/plugin-transform-template-literals",
@@ -8,6 +9,8 @@
     "@babel/plugin-transform-parameters",
     "@babel/plugin-transform-for-of",
     "@babel/plugin-transform-destructuring",
+
+    // "@babel/plugin-transform-regenerator",
     "./plugins/inOperator.mjs",
     "./plugins/symbolCheck.mjs",
     "./plugins/void.mjs"
