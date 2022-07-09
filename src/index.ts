@@ -82,7 +82,7 @@ getBarAttributes = function (sheet) {
 
 //region SHEET INITIALIZATION FUNCTIONS: initialize every element of the sheet, tab by tab, to update dependent fields when modified and trigger rolls when clicked
 
-const initRaceLabel = function (sheet: Sheet) {
+const initRaceLabel = function (sheet: Sheets) {
   // [called in init] calculates the 'race' id component to pass info into the character manager, it's just neat fancy sparkles <3
   // const updateRaceLabel = function () {
   //     let fakeRaceLabel = '';

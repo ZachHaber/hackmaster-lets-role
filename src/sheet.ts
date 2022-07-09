@@ -15,24 +15,16 @@ export const versions: Record<sheets, number> = {
 export type MainSheet = Sheet<sheets.main>;
 export type MonsterSheet = Sheet<sheets.monster>;
 
-export type AllSheets = MainSheet | MonsterSheet;
-
-export function isMainSheet<ST extends Sheets>(
-  sheet: Sheet<ST>
-): // @ts-ignore
-sheet is MainSheet {
+export function isMainSheet(sheet: Sheets): sheet is MainSheet {
   return sheet.id() === sheets.main;
 }
-export function isMonsterSheet<ST extends Sheets>(
-  sheet: Sheet<ST>
-): // @ts-ignore
-sheet is MonsterSheet {
+export function isMonsterSheet(sheet: Sheets): sheet is MonsterSheet {
   return sheet.id() === sheets.monster;
 }
 
-type ModifyIds<ST extends Sheets> = { [id: string]: keyof SheetSetup[ST] };
+type ModifyIds<ST extends SheetTypes> = { [id: string]: keyof SheetSetup[ST] };
 
-interface Update<ST extends Sheets> {
+interface Update<ST extends SheetTypes> {
   /**
    * The updates to apply to the sheet.
    */
@@ -53,11 +45,11 @@ interface Update<ST extends Sheets> {
   modifiedRepeaterIds: { [repeaterId: string]: ModifyIds<ST> };
 }
 
-function getVersionTransformations<ST extends Sheets>(
-  curSheet: Sheet<ST>,
+function getVersionTransformations<Sheet extends Sheets>(
+  curSheet: Sheet,
   version: number
-): Update<ST> {
-  const updates: Update<ST> = {
+): Update<GetSheetType<Sheet>> {
+  const updates: Update<GetSheetType<Sheet>> = {
     updates: {},
     modifiedComponentIds: {},
     modifiedRepeaterIds: {},
@@ -72,6 +64,7 @@ function getVersionTransformations<ST extends Sheets>(
       }
       break;
   }
+
   if (isMainSheet(curSheet)) {
     const sheet: MainSheet = curSheet;
     switch (version) {
@@ -84,6 +77,8 @@ function getVersionTransformations<ST extends Sheets>(
       case 0: {
       }
     }
+  } else {
+    assertUnreachable(curSheet);
   }
 
   return updates;
@@ -101,15 +96,20 @@ export type MainSheetData = {
 } & UniversalSheetData &
   Record<Attributes, number | undefined>;
 
-export type MonsterSheetData = UniversalSheetData;
+export type MonsterSheetData = {} & UniversalSheetData;
 declare global {
   interface SheetSetup {
     [sheets.main]: MainSheetData;
     [sheets.monster]: MonsterSheetData;
   }
+
+  interface SheetMap {
+    [sheets.main]: Sheet<sheets.main>;
+    [sheets.monster]: Sheet<sheets.monster>;
+  }
 }
 
-export function upgradeSheet(sheet: Sheet) {
+export function upgradeSheet(sheet: Sheets) {
   const newVersion = versions[sheet.id()];
   for (
     let oldVersion = sheet.getData().version || 0;
@@ -162,25 +162,23 @@ function convertIdToString(id: number) {
   );
 }
 
-export function applyUpdates<ST extends Sheets>(
-  sheet: Sheet<ST>,
-  updates: Partial<SheetSetup[ST]>
+export function applyUpdates<Sheet extends Sheets>(
+  sheet: Sheet,
+  updates: Partial<SheetSetup[GetSheetType<Sheet>]>
 ) {
   const arr = Object.entries(updates);
   for (let i = 0; i < arr.length; i += 20) {
-    const batch = Object.fromEntries(arr.slice(i, i + 20)) as Partial<
-      SheetSetup[ST]
-    >;
+    const batch = Object.fromEntries(arr.slice(i, i + 20));
     sheet.setData(batch);
   }
 }
 
-function getModificationUpdates<ST extends Sheets>(
-  sheet: Sheet<ST>,
-  modifiedComponentIds: Record<string, keyof SheetSetup[ST]>
-): Partial<SheetSetup[ST]> {
+function getModificationUpdates<Sheet extends Sheets>(
+  sheet: Sheet,
+  modifiedComponentIds: Record<string, keyof SheetSetup[GetSheetType<Sheet>]>
+): Partial<SheetSetup[GetSheetType<Sheet>]> {
   const data = sheet.getData();
-  const modifyUpdates: Partial<SheetSetup[ST]> = {};
+  const modifyUpdates: Partial<SheetSetup[GetSheetType<Sheet>]> = {};
   each(modifiedComponentIds, (newId, oldId) => {
     // const B : ST = 'main';
     const oldIdCast = oldId as unknown as keyof UniversalSheetData;
@@ -188,7 +186,8 @@ function getModificationUpdates<ST extends Sheets>(
     if (data[oldIdCast] != null) {
       // Clear out old data to save space
       // See if we can set it to undefined to fully remove the data.
-      modifyUpdates[oldIdCast as keyof SheetSetup[ST]] = undefined;
+      modifyUpdates[oldIdCast as keyof SheetSetup[GetSheetType<Sheet>]] =
+        undefined;
       // If there's old data, transfer it to the new property
       modifyUpdates[newId] = data[oldIdCast] as any;
     }
@@ -197,12 +196,12 @@ function getModificationUpdates<ST extends Sheets>(
   return modifyUpdates;
 }
 
-function getRepeaterUpdates<ST extends Sheets>(
-  sheet: Sheet<ST>,
-  modifiedRepeaterIds: { [repeaterId: string]: ModifyIds<ST> }
+function getRepeaterUpdates<Sheet extends Sheets>(
+  sheet: Sheets,
+  modifiedRepeaterIds: { [repeaterId: string]: ModifyIds<GetSheetType<Sheet>> }
   // modifiedComponentIds: Record<string, string>
 ) {
-  const updates: Partial<SheetSetup[ST]> = {};
+  const updates: Partial<SheetSetup[GetSheetType<Sheet>]> = {};
   // const invertedComponentIds = Object.fromEntries(
   //   Object.entries(modifiedComponentIds).map((entry) => entry.reverse())
   // );
@@ -246,7 +245,7 @@ function getRepeaterUpdates<ST extends Sheets>(
 /**
  * Is this needed? Need to check.
  */
-const cleanRepeater = function (sheet: Sheet, repeater: string) {
+const cleanRepeater = function (sheet: Sheets, repeater: string) {
   const data = sheet.get(repeater)?.value();
   // [called in transferValuesToModifiedIds] a bug currently doubles and glitches some entries when updating repeater data; this can be solved by clearing the repeater multiple times before setting the data. As I use setData as often as possible in this script to avoid excessive calls to the server, I need a function that clears the repeaters of bugs after each update
   if (isObject(data)) {

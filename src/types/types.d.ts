@@ -85,11 +85,17 @@ declare interface SheetData extends Record<string, ComponentValue> {
 
 declare interface SheetSetup {}
 
-declare type Sheets = keyof SheetSetup;
+declare type SheetTypes = keyof SheetSetup;
 
-declare type SheetType<TypedSheet extends Sheet> = ReturnType<TypedSheet['id']>;
+declare type GetSheetType<TypedSheet extends Sheet<any>> = ReturnType<
+  TypedSheet['id']
+>;
 
-declare class Sheet<ST extends Sheets = Sheets> {
+declare interface SheetMap {}
+
+declare type Sheets = SheetMap[keyof SheetMap];
+
+declare class Sheet<ST extends SheetTypes> {
   private constructor();
   /** Get a component by its id */
   get<T extends ComponentValue>(id: string): Component<T> | null;
@@ -156,7 +162,7 @@ declare class Sheet<ST extends Sheets = Sheets> {
 
 declare class Component<T = ComponentValue> {
   /** @returns the Sheet associated with this component */
-  sheet(): Sheet;
+  sheet(): Sheets;
   /** Get the parent component */
   parent(): Component | null;
 
@@ -318,7 +324,7 @@ type ComponentValue = BaseComponentValue | RepeaterValue;
   };
 
  */
-declare let init: (sheet: Sheet) => void;
+declare let init: (sheet: Sheets) => void;
 
 /**
  * Called when dropping a craft onto a character sheet.
@@ -337,7 +343,7 @@ declare let init: (sheet: Sheet) => void;
  * @param from Source Sheet
  * @param to Target's Sheet
  */
-declare let drop: (from: Sheet, to: Sheet) => void | string;
+declare let drop: (from: Sheets, to: Sheets) => void | string;
 
 /**
  * For some systems, it can be useful to drag'n'drop a dice result onto the sheet
@@ -355,7 +361,7 @@ declare let drop: (from: Sheet, to: Sheet) => void | string;
   };
  */
 
-declare let dropDice: (result: DiceResult, to: Sheet) => void;
+declare let dropDice: (result: DiceResult, to: Sheets) => void;
 
 /**
  *
@@ -366,7 +372,7 @@ declare let dropDice: (result: DiceResult, to: Sheet) => void;
  */
 declare type InitRollCallback = (
   view: string,
-  onRender: (sheet: Sheet) => void
+  onRender: (sheet: Sheets) => void
 ) => void;
 
 /**
@@ -432,7 +438,7 @@ declare let initRoll: InitRollFunction;
   };
  */
 declare let getBarAttributes: (
-  sheet: Sheet
+  sheet: Sheets
 ) => Record<string, readonly [string, string | number] | undefined>;
 
 /**
@@ -468,7 +474,7 @@ declare class Binding {
    *
    * Sends a binding into the chat. The binding must have been registered with Binding.{@link add()}
    */
-  send(sheet: Sheet, name: string): void;
+  send(sheet: Sheets, name: string): void;
 
   /**
    *
