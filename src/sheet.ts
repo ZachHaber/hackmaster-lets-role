@@ -12,14 +12,100 @@ export const versions: Record<sheets, number> = {
   monster: 1,
 };
 
-declare global {
-  interface Sheet {
-    id(): sheets;
+export type MainSheet = Sheet<sheets.main>;
+export type MonsterSheet = Sheet<sheets.monster>;
+
+export type AllSheets = MainSheet | MonsterSheet;
+
+export function isMainSheet<ST extends Sheets>(
+  sheet: Sheet<ST>
+): // @ts-ignore
+sheet is MainSheet {
+  return sheet.id() === sheets.main;
+}
+export function isMonsterSheet<ST extends Sheets>(
+  sheet: Sheet<ST>
+): // @ts-ignore
+sheet is MonsterSheet {
+  return sheet.id() === sheets.monster;
+}
+
+type ModifyIds<ST extends Sheets> = { [id: string]: keyof SheetSetup[ST] };
+
+interface Update<ST extends Sheets> {
+  /**
+   * The updates to apply to the sheet.
+   */
+  updates: Partial<SheetSetup[ST]>;
+  /**
+   * Automagical translation from one sheet id to another, while removing data from the original
+   * It will hopefully work for changing a property and then updating it updates as well. i.e.
+   * @example
+   * updates.name = 'test';
+   * modifiedComponentIds.name = 'newName';
+   * // sheetData.name==='test' && sheetData.newName === oldData.name;
+   */
+  modifiedComponentIds: ModifyIds<ST>;
+  /**
+   * Automatical translation of ids in a repeater to new ids
+   * If the repeater also changed ids (in modifiedComponentIds), this will use the old id to get data and put it into the new id
+   */
+  modifiedRepeaterIds: { [repeaterId: string]: ModifyIds<ST> };
+}
+
+function getVersionTransformations<ST extends Sheets>(
+  curSheet: Sheet<ST>,
+  version: number
+): Update<ST> {
+  const updates: Update<ST> = {
+    updates: {},
+    modifiedComponentIds: {},
+    modifiedRepeaterIds: {},
+  };
+
+  // const sheetType = curSheet.id();
+  switch (version) {
+    // for changes that need to be made to all sheets at a particular version (mainly first init)
+    case 0:
+      {
+        updates.updates.uid = convertIdToString(curSheet.getSheetId());
+      }
+      break;
   }
-  interface SheetData extends Record<Attributes, number | undefined> {
-    skillDifficulty: string;
-    diceVisibility: DiceVisibility;
-    version: number;
+  if (isMainSheet(curSheet)) {
+    const sheet: MainSheet = curSheet;
+    switch (version) {
+      case 0: {
+      }
+    }
+  } else if (isMonsterSheet(curSheet)) {
+    const sheet: MonsterSheet = curSheet;
+    switch (version) {
+      case 0: {
+      }
+    }
+  }
+
+  return updates;
+}
+
+export type UniversalSheetData = {
+  uid: string;
+  version: number;
+  diceVisibility: DiceVisibility;
+  [componentId: string]: ComponentValue;
+};
+
+export type MainSheetData = {
+  skillDifficulty: string;
+} & UniversalSheetData &
+  Record<Attributes, number | undefined>;
+
+export type MonsterSheetData = UniversalSheetData;
+declare global {
+  interface SheetSetup {
+    [sheets.main]: MainSheetData;
+    [sheets.monster]: MonsterSheetData;
   }
 }
 
@@ -30,70 +116,31 @@ export function upgradeSheet(sheet: Sheet) {
     oldVersion < newVersion;
     ++oldVersion
   ) {
-    const data = sheet.getData();
-    /**
-     * The updates to apply to the sheet.
-     */
-    let updates: Partial<SheetData> = {};
-    /**
-     * Automagical translation from one sheet id to another, while removing data from the original
-     * It will hopefully work for changing a property and then updating it updates as well. i.e.
-     * @example
-     * updates.name = 'test';
-     * modifiedComponentIds.name = 'newName';
-     * // sheetData.name==='test' && sheetData.newName === oldData.name;
-     */
-    let modifiedComponentIds: Record<string, string> = {};
-    /**
-     * Automatical translation of ids in a repeater to new ids
-     * If the repeater also changed ids (in modifiedComponentIds), this will use the old id to get data and put it into the new id
-     */
-    let modifiedRepeaterIds: { [repeaterId: string]: Record<string, string> } =
-      {};
-    // Apply updates independently by sheet type. - Each sheet type is versioned independently
-    switch (sheet.id()) {
-      case sheets.main: {
-        switch (oldVersion) {
-          case 0:
-            {
-              // Initial sheet creation (i.e. updating from version 0 to 1)
-              updates.uid = convertIdToString(sheet.getSheetId());
-              // Add values to modifiedComponentIds here to automatically add to updates.
-            }
-            break;
-        }
+    log(
+      `Updating ${sheet.id()}.${sheet.getSheetId()} from ${oldVersion} to ${
+        oldVersion + 1
+      }`
+    );
+    const allUpdates = getVersionTransformations(sheet, oldVersion);
 
-        break;
-      }
-      case sheets.monster: {
-        switch (oldVersion) {
-          case 0:
-            {
-              // Initial sheet creation (i.e. updating from version 0 to 1)
-              updates.uid = convertIdToString(sheet.getSheetId());
-              // Add values to modifiedComponentIds here to automatically add to updates.
-            }
-            break;
-        }
-        break;
-      }
-    }
-
-    const repeaterUpdates = getRepeaterUpdates(sheet, modifiedRepeaterIds);
     // Make the modify updates apply first, so that you can change an id and still re-use the old id for a new data value without skipping a version
-    updates = {
-      ...getModificationUpdates(sheet, modifiedComponentIds),
-      ...updates,
-      ...repeaterUpdates,
+    const updates = {
+      ...getModificationUpdates(sheet, allUpdates.modifiedComponentIds),
+      ...allUpdates.updates,
+      // ...repeaterUpdates,
     };
     // Apply the next version number (old + 1) to the sheet!
     updates.version = oldVersion + 1;
-    log(
-      `Updating ${sheet.id()}.${sheet.getSheetId()} from ${oldVersion} to ${
-        updates.version
-      }`
-    );
     applyUpdates(sheet, updates);
+
+    // Apply repeater updates after the others repeater changes ids, you can apply the updates based on the new id.
+    const repeaterUpdates = getRepeaterUpdates(
+      sheet,
+      allUpdates.modifiedRepeaterIds
+    );
+    if (repeaterUpdates) {
+      applyUpdates(sheet, repeaterUpdates);
+    }
     //// In case it turns out to be needed (mention of a glitch before)
     // for(const repeaterId of Object.keys(repeaterUpdates)){
     //   cleanRepeater(sheet,repeaterId);
@@ -109,45 +156,53 @@ function convertIdToString(id: number) {
       .toString(10)
       .split('')
       .map((char) => {
-        return char.charCodeAt(0) + numToLetter;
+        return String.fromCharCode(char.charCodeAt(0) + numToLetter);
       })
       .join('')
   );
 }
 
-export function applyUpdates(sheet: Sheet, updates: Partial<SheetData>) {
+export function applyUpdates<ST extends Sheets>(
+  sheet: Sheet<ST>,
+  updates: Partial<SheetSetup[ST]>
+) {
   const arr = Object.entries(updates);
   for (let i = 0; i < arr.length; i += 20) {
-    const batch = Object.fromEntries(arr.slice(i, i + 20));
+    const batch = Object.fromEntries(arr.slice(i, i + 20)) as Partial<
+      SheetSetup[ST]
+    >;
     sheet.setData(batch);
   }
 }
 
-function getModificationUpdates(
-  sheet: Sheet,
-  modifiedComponentIds: Record<string, string>
-): Partial<SheetData> {
+function getModificationUpdates<ST extends Sheets>(
+  sheet: Sheet<ST>,
+  modifiedComponentIds: Record<string, keyof SheetSetup[ST]>
+): Partial<SheetSetup[ST]> {
   const data = sheet.getData();
-  const modifyUpdates: Partial<SheetData> = {};
+  const modifyUpdates: Partial<SheetSetup[ST]> = {};
   each(modifiedComponentIds, (newId, oldId) => {
-    if (data[oldId] != null) {
+    // const B : ST = 'main';
+    const oldIdCast = oldId as unknown as keyof UniversalSheetData;
+    // cast oldId to pretend to be an actual ID, because there's no guarantee we are keeping it around
+    if (data[oldIdCast] != null) {
       // Clear out old data to save space
       // See if we can set it to undefined to fully remove the data.
-      modifyUpdates[oldId] = undefined;
+      modifyUpdates[oldIdCast as keyof SheetSetup[ST]] = undefined;
       // If there's old data, transfer it to the new property
-      modifyUpdates[newId] = data[oldId];
+      modifyUpdates[newId] = data[oldIdCast] as any;
     }
   });
 
   return modifyUpdates;
 }
 
-function getRepeaterUpdates(
-  sheet: Sheet,
-  modifiedRepeaterIds: { [repeaterId: string]: Record<string, string> }
+function getRepeaterUpdates<ST extends Sheets>(
+  sheet: Sheet<ST>,
+  modifiedRepeaterIds: { [repeaterId: string]: ModifyIds<ST> }
   // modifiedComponentIds: Record<string, string>
 ) {
-  const updates: Partial<SheetData> = {};
+  const updates: Partial<SheetSetup[ST]> = {};
   // const invertedComponentIds = Object.fromEntries(
   //   Object.entries(modifiedComponentIds).map((entry) => entry.reverse())
   // );
@@ -159,30 +214,31 @@ function getRepeaterUpdates(
     }
     // if there's an old ID associated with the repeaterId, use the originalId for getting the data for the mods
     // const originalId = invertedComponentIds(repeaterId) || repeaterId;
-    const repeater = sheet.get<string[]>(repeaterId);
+    const repeater = sheet.get<RepeaterValue>(repeaterId);
     if (!repeater) {
       // Couldn't find the repeater!
       continue;
     }
-    for (const entryId of repeater.value()) {
-      const values = repeater.find(entryId)?.value();
-      if (!values) {
-        continue;
+    each(repeater.value(), (values, entryId) => {
+      if (!values || typeof values !== 'object') {
+        return;
       }
-      updates[repeaterId] = {
-        ...((updates[repeaterId] as {}) || {}),
-        [entryId]: Object.entries(values).map(([key, value]) => {
+      (updates[repeaterId] as RepeaterValue)[entryId] = Object.fromEntries(
+        Object.entries(values).map(([key, value]) => {
           const newKey = modifiedIds[key] || key;
           if (newKey !== key) {
             hasUpdate = true;
           }
           return [newKey, value];
-        }),
-      };
-    }
+        })
+      );
+    });
     if (!hasUpdate) {
       delete updates[repeaterId];
     }
+  }
+  if (!Object.keys(updates).length) {
+    return undefined;
   }
   return updates;
 }
@@ -208,3 +264,7 @@ const cleanRepeater = function (sheet: Sheet, repeater: string) {
     sheet.setData({ [repeater]: data });
   }
 };
+
+function assertUnreachable(_x: never): never {
+  throw new Error("Didn't expect to get here");
+}

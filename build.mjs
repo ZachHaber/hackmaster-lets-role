@@ -20,13 +20,13 @@ try {
         if (error) console.error('watch build failed:', error);
         else {
           await transpileBuild(result);
-          console.log('watch build succeeded');
+          console.log(`${new Date().toISOString()}: watch build succeeded`);
         }
       },
     },
   });
   await transpileBuild(result);
-  console.log('Initial Build');
+  console.log(`${new Date().toISOString()}: Initial Build`);
 } catch (error) {
   console.error(error);
   process.exit(1);

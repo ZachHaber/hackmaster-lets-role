@@ -1,4 +1,4 @@
-import { sheets, upgradeSheet } from './sheet';
+import { isMainSheet, sheets, upgradeSheet } from './sheet';
 // write your custom scripts here
 
 // import { tableToArray, toMap } from './utils';
@@ -12,7 +12,8 @@ init = function (sheet) {
   // [triggered when any character sheet, craft, or dice roll is first displayed] This includes entries in the dice log.
   Bindings.clear(sheet.id()); // clear any remaining bindings in the item to avoid any unplanned messages at initialization
   upgradeSheet(sheet);
-  if (sheet.id() === sheets.main) {
+  if (isMainSheet(sheet)) {
+    const main: Sheet<sheets.main> = sheet;
     // if item is a character sheet (currently, no code executed for any other type of item)
     log('Start initializing sheet');
     //log("Transferring data from old to new ids for components for which the id was changed");
@@ -24,8 +25,7 @@ init = function (sheet) {
 
     // log('Initializing "race" string for Character Manager label');
     // // initRaceLabel(sheet);
-
-    initSkills(sheet);
+    initSkills(main);
     // let values = sheet.getData().diceVisibility;
     // log(values)
     // log("Finished initializing sheet. Have fun!");
@@ -105,7 +105,7 @@ const initRaceLabel = function (sheet: Sheet) {
   // })
 };
 
-const initSkills = function (sheet: Sheet) {
+const initSkills = function (sheet: Sheet<sheets.main>) {
   Tables.get('skills').each((skill) => {
     sheet.get(skill.id)?.on('click', function () {
       const data = sheet.getData();

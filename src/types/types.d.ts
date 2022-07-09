@@ -83,14 +83,24 @@ declare interface SheetData extends Record<string, ComponentValue> {
   uid: string;
 }
 
-declare class Sheet {
+declare interface SheetSetup {}
+
+declare type Sheets = keyof SheetSetup;
+
+declare type SheetType<TypedSheet extends Sheet> = ReturnType<TypedSheet['id']>;
+
+declare class Sheet<ST extends Sheets = Sheets> {
+  private constructor();
   /** Get a component by its id */
   get<T extends ComponentValue>(id: string): Component<T> | null;
+  get(
+    is: keyof SheetSetup[ST]
+  ): Component<SheetSetup[ST][keyof SheetSetup[ST]]>;
   /** Get a variable's value by its id */
   getVariable(id: string): string | number | null;
 
   /** Get the id of the sheet (the id of the top view component) */
-  id(): string;
+  id(): ST;
   /** The unique ID of the sheet (ie a sheet creation order index on Let's Role). Used to distinguish a leaf from another leaf of the same type */
   getSheetId(): number;
   /** Get the name of the sheet */
@@ -133,15 +143,15 @@ declare class Sheet {
   prompt(
     title: string,
     view: string,
-    callback: (data: SheetData) => void,
-    callbackInit?: (view: Sheet) => void
+    callback: (data: SheetSetup[ST]) => void,
+    callbackInit?: (view: Sheet<ST>) => void
   ): void;
   /** Set multiple sheet data at once (including components values).
    *
    * You can only set __20__ values at a time. */
-  setData(data: Partial<SheetData>): void;
+  setData(data: Partial<SheetSetup[ST]>): void;
 
-  getData(): SheetData;
+  getData(): SheetSetup[ST];
 }
 
 declare class Component<T = ComponentValue> {
@@ -278,7 +288,9 @@ log(hp.rawValue()); // 17
 
 type EventType = 'click' | 'update' | 'mouseenter' | 'mouseleave' | 'keyup';
 
-type ComponentValue = undefined | null | number | string | object | boolean;
+type BaseComponentValue = undefined | null | number | string | boolean;
+type RepeaterValue = Record<string, Record<string, BaseComponentValue>>;
+type ComponentValue = BaseComponentValue | RepeaterValue;
 
 /// Global!
 /**
@@ -503,7 +515,7 @@ declare class DiceBuilder {
 declare const Dice: {
   create(input: DiceValue): DiceBuilder;
   roll(
-    sheet: Sheet,
+    sheet: Sheet<any>,
     expression: DiceValue,
     title?: string,
     visibility?: DiceVisibility,
