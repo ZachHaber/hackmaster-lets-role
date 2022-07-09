@@ -3,6 +3,8 @@ import babel from '@babel/core';
 import fs from 'fs-extra';
 import { argv } from 'process';
 import path from 'path';
+import typescript from 'typescript';
+import esbuildPluginTsc from './plugins/esbuild-plugin-tsc.mjs';
 
 const isBuild = argv.some((arg) => ['-b', '--build'].includes(arg));
 const isWatch = argv.some((arg) => ['-w', '--watch'].includes(arg));
@@ -55,6 +57,7 @@ try {
     format: 'esm',
     write: false,
     minify: isBuild,
+    tsconfig: './tsconfig.esbuild.json',
     watch: isWatch && {
       async onRebuild(error, result) {
         if (error) console.error('watch build failed:', error);
@@ -64,6 +67,9 @@ try {
         }
       },
     },
+    plugins: [
+      // esbuildPluginTsc({ tsconfigPath: './tsconfig.json', force: true }),
+    ],
   });
   await transpileBuild(result);
   console.log('Initial Build');
@@ -81,30 +87,46 @@ async function transpileBuild({ outputFiles }) {
     const raw = new TextDecoder().decode(contents);
     await fs.ensureDir(path.dirname(filePath));
     if (filePath.endsWith('.js')) {
-      const res = await babel.transformAsync(raw, {
+      const res = typescript.transpile(raw, {
+        allowJs: true,
+        checkJs: false,
+        target: typescript.ScriptTarget.ES5,
+        lib: ['ESNext'],
+        downlevelIteration: true,
+      });
+      const transpiled = await babel.transformAsync(res, {
         minified: isBuild,
         configFile: true,
         filename: path.basename(filePath),
       });
-      await fs.writeFile(
-        filePath,
-        res.code
-          .replaceAll(
-            `import { _generator } from "babel-plugin-lite-regenerator-runtime";`,
-            generator
-          )
-          .replaceAll(
-            `import { _awaiter } from "babel-plugin-lite-regenerator-runtime";`,
-            awaiter
-          ),
-        {
-          flag: 'w',
-        }
-      );
-    } else {
-      // don't run css through babel
-      await fs.writeFile(filePath, raw, { flag: 'w' });
+      await fs.writeFile(filePath, transpiled.code, { flag: 'w' });
+      return;
     }
+    // if (filePath.endsWith('.js')) {
+    //   const res = await babel.transformAsync(raw, {
+    //     minified: isBuild,
+    //     configFile: true,
+    //     filename: path.basename(filePath),
+    //   });
+    //   await fs.writeFile(
+    //     filePath,
+    //     res.code
+    //       .replaceAll(
+    //         `import { _generator } from "babel-plugin-lite-regenerator-runtime";`,
+    //         generator
+    //       )
+    //       .replaceAll(
+    //         `import { _awaiter } from "babel-plugin-lite-regenerator-runtime";`,
+    //         awaiter
+    //       ),
+    //     {
+    //       flag: 'w',
+    //     }
+    //   );
+    // } else {
+    //   // don't run css through babel
+    // }
+    await fs.writeFile(filePath, raw, { flag: 'w' });
   }
 }
 
