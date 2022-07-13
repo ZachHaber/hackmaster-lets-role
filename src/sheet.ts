@@ -1,3 +1,4 @@
+import type { IconName } from '@fortawesome/fontawesome-common-types';
 import { isObject, length, tableToArray } from './utils';
 
 export enum sheets {
@@ -104,6 +105,8 @@ export type MainSheetData = {
   universal: { [entryId: string]: SkillRepeater };
   sortSkillsName: string;
   sortSkillsPercent: string;
+  filterSkills: string;
+  filterSkillsIcon: IconName;
 } & UniversalSheetData &
   Record<Attributes, number | undefined>;
 

@@ -146,6 +146,42 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
     sheet.get(id).on('click', sortHandler);
   });
 
+  const filterSkills = sheet.get('filterSkills');
+  if (filterSkills.value()) {
+    filterSkills.value('');
+  }
+  sheet.get('filterSkillsIcon').on('click', () => {
+    sheet.get('filterSkills').value('');
+  });
+
+  sheet.get('filterSkills').on('update', (event) => {
+    const search = event.value().toLocaleLowerCase();
+    sheet.get('filterSkillsIcon').value(search ? 'times' : 'search');
+    const repeater = sheet.get('universal');
+    const table = Tables.get('skills');
+    each(repeater.value(), (entry, entryId) => {
+      const skill = table.get(entry.skill);
+      if (!skill) {
+        log(`${entry.skill} does not exist in the table!`);
+        return;
+      }
+      const entryComponent = repeater.find(entryId as string);
+      if (!entryComponent) {
+        return;
+      }
+      const visible = entryComponent.visible();
+      if (skill.label.toLocaleLowerCase().includes(search)) {
+        if (!visible) {
+          entryComponent.show();
+        }
+      } else {
+        if (visible) {
+          entryComponent.hide();
+        }
+      }
+    });
+  });
+
   // Tables.get('skills').each((skill) => {
   //   sheet.get(skill.id)?.on('click', function () {
   //     const data = sheet.getData();

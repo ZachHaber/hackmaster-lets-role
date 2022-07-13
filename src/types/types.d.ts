@@ -188,7 +188,7 @@ declare class Component<T = ComponentValue> {
    *
    * If the event is triggered from code, it will have the property `computed` to `true`. It’s possible to delegate events to a subcomponent, useful when using repeaters. It’s only possible to have one event of the same type for a component at once.
    */
-  on(event: EventType, callback: (event: any) => void): void;
+  on(event: EventType, callback: (event: this) => void): void;
   on(event: 'click', callback: (event: this) => void): void;
   /**
    *
@@ -198,7 +198,7 @@ declare class Component<T = ComponentValue> {
    *
    * If the event is triggered from code, it will have the property `computed` to `true`. It’s possible to delegate events to a subcomponent, useful when using repeaters. It’s only possible to have one event of the same type for a component at once.
    */
-  on(event: EventType, delegate: string, callback: (event: any) => void): void;
+  on(event: EventType, delegate: string, callback: (event: this) => void): void;
 
   /**
    *
