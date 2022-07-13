@@ -358,8 +358,8 @@ function compareSkill(
   if (property === 'percentDisplay') {
     return (
       dirMul *
-        ((a.percent === 0 ? a.defaultPercent || 0 : a.percent) -
-          (b.percent === 0 ? b.defaultPercent || 0 : b.percent)) ||
+        ((a.percent || a.defaultPercent || 0) -
+          (b.percent || b.defaultPercent || 0)) ||
       compareSkill(table, a, b, 'label', 1)
     );
   }
