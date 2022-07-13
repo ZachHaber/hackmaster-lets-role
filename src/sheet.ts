@@ -1,4 +1,4 @@
-import { isObject, length } from './utils';
+import { isObject, length, tableToArray } from './utils';
 
 export enum sheets {
   main = 'main',
@@ -88,11 +88,22 @@ export type UniversalSheetData = {
   uid: string;
   version: number;
   diceVisibility: DiceVisibility;
-  [componentId: string]: ComponentValue;
+  // [componentId: string]: ComponentValue;
 };
+
+interface SkillRepeater {
+  skill: string;
+  skillDisplay?: string;
+  percent: number;
+  percentDisplay?: string;
+  defaultPercent?: number;
+}
 
 export type MainSheetData = {
   skillDifficulty: string;
+  universal: { [entryId: string]: SkillRepeater };
+  sortSkillsName: string;
+  sortSkillsPercent: string;
 } & UniversalSheetData &
   Record<Attributes, number | undefined>;
 
@@ -112,6 +123,7 @@ declare global {
 export function upgradeSheet(sheet: Sheets) {
   const newVersion = versions[sheet.id()];
   for (
+    // Change this for prod!
     let oldVersion = sheet.getData().version || 0;
     oldVersion < newVersion;
     ++oldVersion
@@ -213,7 +225,9 @@ function getRepeaterUpdates<Sheet extends Sheets>(
     }
     // if there's an old ID associated with the repeaterId, use the originalId for getting the data for the mods
     // const originalId = invertedComponentIds(repeaterId) || repeaterId;
-    const repeater = sheet.get<RepeaterValue>(repeaterId);
+    const repeater = sheet.get(
+      repeaterId as keyof UniversalSheetData
+    ) as unknown as Component<RepeaterValue>;
     if (!repeater) {
       // Couldn't find the repeater!
       continue;
@@ -222,7 +236,11 @@ function getRepeaterUpdates<Sheet extends Sheets>(
       if (!values || typeof values !== 'object') {
         return;
       }
-      (updates[repeaterId] as RepeaterValue)[entryId] = Object.fromEntries(
+      (
+        updates[
+          repeaterId as keyof SheetSetup[GetSheetType<Sheet>]
+        ] as unknown as RepeaterValue
+      )[entryId] = Object.fromEntries(
         Object.entries(values).map(([key, value]) => {
           const newKey = modifiedIds[key] || key;
           if (newKey !== key) {
@@ -233,7 +251,7 @@ function getRepeaterUpdates<Sheet extends Sheets>(
       );
     });
     if (!hasUpdate) {
-      delete updates[repeaterId];
+      delete updates[repeaterId as keyof SheetSetup[GetSheetType<Sheet>]];
     }
   }
   if (!Object.keys(updates).length) {
@@ -245,8 +263,12 @@ function getRepeaterUpdates<Sheet extends Sheets>(
 /**
  * Is this needed? Need to check.
  */
-const cleanRepeater = function (sheet: Sheets, repeater: string) {
-  const data = sheet.get(repeater)?.value();
+const cleanRepeater = function (
+  sheet: Sheets,
+  repeater: string,
+  numClears: number = 0
+) {
+  const data = sheet.get(repeater as any)?.value();
   // [called in transferValuesToModifiedIds] a bug currently doubles and glitches some entries when updating repeater data; this can be solved by clearing the repeater multiple times before setting the data. As I use setData as often as possible in this script to avoid excessive calls to the server, I need a function that clears the repeaters of bugs after each update
   if (isObject(data)) {
     // first check if repeater does contain an entry; otherwise the rest of the function will crash
@@ -254,7 +276,7 @@ const cleanRepeater = function (sheet: Sheets, repeater: string) {
     // let originalData = sheet.get(repeater).value();
 
     //Clearing repeater as many times as half its number of entries to avoid the bug that doubles some entries after updating values
-    let numberOfClears = length(data);
+    let numberOfClears = numClears || length(data);
     for (let i = 1; i <= numberOfClears; i++) {
       sheet.setData({ [repeater]: {} });
     }
@@ -266,4 +288,95 @@ const cleanRepeater = function (sheet: Sheets, repeater: string) {
 
 function assertUnreachable(_x: never): never {
   throw new Error("Didn't expect to get here");
+}
+
+export function ensureUniversalSkillsExist(sheet: MainSheet) {
+  const skillTable = Tables.get('skills');
+  const skills = tableToArray(skillTable);
+  const universalSkills = skills.filter(
+    (skill) => skill.section === 'universal'
+  );
+  const repeater = sheet.get('universal');
+  const entries = repeater.value();
+  let allValues = Object.entries(entries || {});
+  const extantSkills = Object.fromEntries(
+    allValues.map((skill) => [skill[1].skill, true])
+  );
+  const skillsToAdd = universalSkills.filter(
+    (skill) => !extantSkills[skill.id]
+  );
+  const data = sheet.getData();
+
+  if (skillsToAdd) {
+    // const universal = Object.fromEntries(
+
+    const skills = skillsToAdd.map<[string, SkillRepeater]>((skill) => {
+      const stats = skill.stats.split(',') as Attributes[];
+      const defaultPercent =
+        Math.min.apply(
+          undefined,
+          stats.map((statId) => data[statId] || 0)
+        ) || 0;
+      return [
+        skill.id,
+        {
+          percent: 0,
+          skill: skill.id,
+          defaultPercent,
+        },
+      ];
+    });
+    repeater.value(
+      Object.fromEntries(sortSkills(skills.concat(allValues), 'label'))
+    );
+
+    // );
+    // repeater.value(universal);
+
+    cleanRepeater(sheet, 'universal');
+  }
+}
+
+export function sortSkills(
+  skillsEntries: [entryId: string, entry: SkillRepeater][],
+  property: 'label' | 'percentDisplay',
+  dir: 'asc' | 'desc' = 'asc'
+) {
+  const skillTable = Tables.get('skills');
+  return skillsEntries.sort((a, b) => {
+    const dirMul = dir === 'asc' ? 1 : -1;
+    return compareSkill(skillTable, a[1], b[1], property, dirMul);
+  });
+}
+function compareSkill(
+  table: Table<Skill>,
+  a: SkillRepeater,
+  b: SkillRepeater,
+  property: 'label' | 'percentDisplay',
+  dirMul: -1 | 1
+): number {
+  if (property === 'percentDisplay') {
+    return (
+      dirMul *
+        ((a.percent === 0 ? a.defaultPercent || 0 : a.percent) -
+          (b.percent === 0 ? b.defaultPercent || 0 : b.percent)) ||
+      compareSkill(table, a, b, 'label', 1)
+    );
+  }
+  const aSkill = table.get(a.skill);
+  const bSkill = table.get(b.skill);
+  if (!aSkill && !bSkill) {
+    return 0;
+  }
+  if (!aSkill) {
+    return 1;
+  }
+  if (!bSkill) {
+    return -1;
+  }
+  return (
+    aSkill.label.localeCompare(bSkill.label, undefined, {
+      sensitivity: 'base',
+    }) * dirMul
+  );
 }

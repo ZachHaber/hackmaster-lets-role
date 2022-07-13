@@ -98,10 +98,8 @@ declare type Sheets = SheetMap[keyof SheetMap];
 declare class Sheet<ST extends SheetTypes> {
   private constructor();
   /** Get a component by its id */
+  get<T extends keyof SheetSetup[ST]>(is: T): Component<SheetSetup[ST][T]>;
   get<T extends ComponentValue>(id: string): Component<T> | null;
-  get(
-    is: keyof SheetSetup[ST]
-  ): Component<SheetSetup[ST][keyof SheetSetup[ST]]>;
   /** Get a variable's value by its id */
   getVariable(id: string): string | number | null;
 
@@ -191,6 +189,7 @@ declare class Component<T = ComponentValue> {
    * If the event is triggered from code, it will have the property `computed` to `true`. It’s possible to delegate events to a subcomponent, useful when using repeaters. It’s only possible to have one event of the same type for a component at once.
    */
   on(event: EventType, callback: (event: any) => void): void;
+  on(event: 'click', callback: (event: this) => void): void;
   /**
    *
    * @param event The name of the event. Possible values : click, update, mouseenter, mouseleave, keyup

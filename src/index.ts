@@ -1,4 +1,10 @@
-import { isMainSheet, sheets, upgradeSheet } from './sheet';
+import {
+  ensureUniversalSkillsExist,
+  isMainSheet,
+  sheets,
+  sortSkills,
+  upgradeSheet,
+} from './sheet';
 // write your custom scripts here
 
 // import { tableToArray, toMap } from './utils';
@@ -106,47 +112,81 @@ const initRaceLabel = function (sheet: Sheets) {
 };
 
 const initSkills = function (sheet: Sheet<sheets.main>) {
-  Tables.get('skills').each((skill) => {
-    sheet.get(skill.id)?.on('click', function () {
-      const data = sheet.getData();
-      let pct = sheet.get<number>(''.concat(skill.id, '_pct'))?.value() || 0;
-      if (skill.section === 'universal') {
-        const trained = data[`${skill.id}_isTrained`];
-        if (!trained) {
-          const stats = skill.stats.split(',') as Attributes[];
-          pct =
-            Math.min.apply(
-              undefined,
-              stats.map((statId) => data[statId] || 0)
-            ) || 0;
-        }
-      } else if (pct === 0) {
-        return;
-      }
-      const diff = Tables.get('rolldiff').get(data.skillDifficulty);
-      const diffMod = parseInt(diff.value);
-      if (diff.id === 'competitive') {
-        // 1d100p!
-        const dice = Dice.create(
-          '(1d100 < 100? reroll(1d100,100): 100 + (1d20 < 20? reroll(1d20,20) : 20 + expl(1d6)))'
-        ).add(''.concat(pct.toString(), '[skillPercent]'));
-        Dice.roll(
-          sheet,
-          dice,
-          ''.concat(skill.label, ' ', diff.label, ' Check'),
-          data.diceVisibility
-        );
-      } else {
-        const dice = Dice.create('1d100').add(diffMod).compare('<', pct);
-        Dice.roll(
-          sheet,
-          dice,
-          ''.concat(skill.label, ' ', diff.label, ' Skill Check'),
-          data.diceVisibility
-        );
-      }
-    });
+  ensureUniversalSkillsExist(sheet);
+  type SortId = 'sortSkillsName' | 'sortSkillsPercent';
+  const sortIds: SortId[] = ['sortSkillsName', 'sortSkillsPercent'];
+  function sortHandler(ev: Component<string>) {
+    const sorts: Record<
+      SortId,
+      { states: string[]; property: 'label' | 'percentDisplay'; other: SortId }
+    > = {
+      sortSkillsPercent: {
+        states: ['Sort by Percent Desc', 'Sort by Percent Asc'],
+        property: 'percentDisplay',
+        other: 'sortSkillsName',
+      },
+      sortSkillsName: {
+        states: ['Sort by Name Desc', 'Sort by Name Asc'],
+        property: 'label',
+        other: 'sortSkillsPercent',
+      },
+    };
+    const repeater = sheet.get('universal');
+    const skills = Object.entries(repeater.value());
+    const dirs = ['asc', 'desc'] as const;
+    const { states, property, other } = sorts[ev.id() as SortId];
+    const index = (states.indexOf(ev.value()) + 1) % states.length;
+    ev.value(states[index]);
+    sheet.get(other).value(sorts[other].states[1]);
+    repeater.value(
+      Object.fromEntries(sortSkills(skills, property, dirs[index]))
+    );
+  }
+  sortIds.forEach((id) => {
+    sheet.get(id).on('click', sortHandler);
   });
+
+  // Tables.get('skills').each((skill) => {
+  //   sheet.get(skill.id)?.on('click', function () {
+  //     const data = sheet.getData();
+  //     let pct = sheet.get<number>(''.concat(skill.id, '_pct'))?.value() || 0;
+  //     if (skill.section === 'universal') {
+  //       const trained = data[`${skill.id}_isTrained`];
+  //       if (!trained) {
+  //         const stats = skill.stats.split(',') as Attributes[];
+  //         pct =
+  //           Math.min.apply(
+  //             undefined,
+  //             stats.map((statId) => data[statId] || 0)
+  //           ) || 0;
+  //       }
+  //     } else if (pct === 0) {
+  //       return;
+  //     }
+  //     const diff = Tables.get('rolldiff').get(data.skillDifficulty);
+  //     const diffMod = parseInt(diff.value);
+  //     if (diff.id === 'competitive') {
+  //       // 1d100p!
+  //       const dice = Dice.create(
+  //         '(1d100 < 100? reroll(1d100,100): 100 + (1d20 < 20? reroll(1d20,20) : 20 + expl(1d6)))'
+  //       ).add(''.concat(pct.toString(), '[skillPercent]'));
+  //       Dice.roll(
+  //         sheet,
+  //         dice,
+  //         ''.concat(skill.label, ' ', diff.label, ' Check'),
+  //         data.diceVisibility
+  //       );
+  //     } else {
+  //       const dice = Dice.create('1d100').add(diffMod).compare('<', pct);
+  //       Dice.roll(
+  //         sheet,
+  //         dice,
+  //         ''.concat(skill.label, ' ', diff.label, ' Skill Check'),
+  //         data.diceVisibility
+  //       );
+  //     }
+  //   });
+  // });
 };
 
 //endregion
