@@ -136,27 +136,31 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
     const dirs = ['asc', 'desc'] as const;
     const { states, property, other } = sorts[ev.id() as SortId];
     const index = (states.indexOf(ev.value()) + 1) % states.length;
-    ev.value(states[index]);
-    sheet.get(other).value(sorts[other].states[1]);
-    repeater.value(
-      Object.fromEntries(sortSkills(skills, property, dirs[index]))
-    );
+    sheet.setData({
+      [ev.id()]: states[index],
+      [other]: sorts[other].states[1],
+      universal: Object.fromEntries(sortSkills(skills, property, dirs[index])),
+    });
   }
   sortIds.forEach((id) => {
     sheet.get(id).on('click', sortHandler);
   });
 
-  const filterSkills = sheet.get('filterSkills');
-  if (filterSkills.value()) {
-    filterSkills.value('');
+  function clearFilterSkills() {
+    sheet.setData({ filterSkills: '' });
   }
-  sheet.get('filterSkillsIcon').on('click', () => {
-    sheet.get('filterSkills').value('');
-  });
 
-  sheet.get('filterSkills').on('update', (event) => {
+  sheet.get('filterSkills').on('update', function (event) {
     const search = event.value().toLocaleLowerCase();
-    sheet.get('filterSkillsIcon').value(search ? 'times' : 'search');
+    const filterSkillsIcon = sheet.get('filterSkillsIcon');
+    filterSkillsIcon.value(search ? 'times' : 'search');
+    filterSkillsIcon[search ? 'addClass' : 'removeClass']('clickable');
+    if (search) {
+      filterSkillsIcon.on('click', clearFilterSkills);
+    } else {
+      filterSkillsIcon.off('click');
+    }
+
     const repeater = sheet.get('universal');
     const table = Tables.get('skills');
     each(repeater.value(), (entry, entryId) => {
@@ -181,6 +185,10 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
       }
     });
   });
+  const filterSkills = sheet.get('filterSkills');
+  if (filterSkills.value()) {
+    filterSkills.value('');
+  }
 
   // Tables.get('skills').each((skill) => {
   //   sheet.get(skill.id)?.on('click', function () {
