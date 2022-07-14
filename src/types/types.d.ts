@@ -179,7 +179,7 @@ declare class Component<T = ComponentValue> {
    *
    * Get a child component.
    */
-  find(id: string): Component | null;
+  find<SubPath extends keyof T>(id: SubPath): Component<T[SubPath]> | null;
 
   /**
    *

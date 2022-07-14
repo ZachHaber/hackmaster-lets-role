@@ -1,6 +1,7 @@
 import {
   ensureUniversalSkillsExist,
   isMainSheet,
+  MainSheetData,
   sheets,
   sortSkills,
   upgradeSheet,
@@ -136,11 +137,13 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
     const dirs = ['asc', 'desc'] as const;
     const { states, property, other } = sorts[ev.id() as SortId];
     const index = (states.indexOf(ev.value()) + 1) % states.length;
-    sheet.setData({
-      [ev.id()]: states[index],
-      [other]: sorts[other].states[1],
+    const update: Partial<MainSheetData> = {
       universal: Object.fromEntries(sortSkills(skills, property, dirs[index])),
-    });
+    };
+
+    update[ev.id() as unknown as SortId] = states[index];
+    update[other] = sorts[other].states[1];
+    sheet.setData(update);
   }
   sortIds.forEach((id) => {
     sheet.get(id).on('click', sortHandler);
@@ -189,6 +192,85 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
   if (filterSkills.value()) {
     filterSkills.value('');
   }
+
+  const repeater = sheet.get('universal');
+
+  function skillClickHandler(input: Component<string | undefined>) {
+    const entryId = input.index();
+    if (!entryId) {
+      // something went wrong
+      log(new Error('invalid entryId'));
+      return;
+    }
+    const data = sheet.getData();
+    const entryData = data.universal[entryId];
+    if (!entryData) {
+      return log('could not find ' + entryId + ' in the repeater');
+    }
+
+    const { percent, skill: skillId, defaultPercent } = entryData;
+    const skill = Tables.get('skills').get(skillId);
+    if (!skill) {
+      log(`${skillId} not found`);
+      return;
+    }
+    const skillPercent = percent || defaultPercent || 0;
+    const diff = Tables.get('rolldiff').get(data.skillDifficulty);
+    const diffMod = parseInt(diff.value);
+    if (diff.id === 'competitive') {
+      // 1d100p!
+      const dice = Dice.create(
+        '(1d100 < 100? reroll(1d100,100): 100 + (1d20 < 20? reroll(1d20,20) : 20 + expl(1d6)))'
+      ).add(''.concat(skillPercent.toString(), '[skillPercent]'));
+      Dice.roll(
+        sheet,
+        dice,
+        ''.concat(skill.label, ' ', diff.label, ' Check'),
+        data.diceVisibility
+      );
+    } else {
+      const dice = Dice.create('1d100').add(diffMod).compare('<', skillPercent);
+      Dice.roll(
+        sheet,
+        dice,
+        ''.concat(skill.label, ' ', diff.label, ' Skill Check'),
+        data.diceVisibility
+      );
+    }
+  }
+  function updateRepeaterDisplay(
+    repeater: Component<MainSheetData['universal']>
+  ) {
+    const table = Tables.get('skills');
+    each(repeater.value(), (item, entryId) => {
+      const entryComponent = repeater.find(entryId as string);
+      if (!entryComponent) {
+        return;
+      }
+
+      entryComponent.find('skillDisplay')?.on('click', skillClickHandler);
+      const skillDisplay = entryComponent?.find('skillDisplay');
+      if (!skillDisplay) {
+        return;
+      }
+      if (!item.skill) {
+        skillDisplay.text('N/A');
+        return;
+      }
+      const skill = table.get(item.skill);
+      if (skill.label !== item.skillDisplay) {
+        if (!skill) {
+          skillDisplay.text(`Skill ${item.skill} not found`);
+        } else {
+          skillDisplay.text(skill.label);
+        }
+      }
+    });
+  }
+  updateRepeaterDisplay(repeater);
+  repeater.on('update', (repeater) => {
+    updateRepeaterDisplay(repeater);
+  });
 
   // Tables.get('skills').each((skill) => {
   //   sheet.get(skill.id)?.on('click', function () {
