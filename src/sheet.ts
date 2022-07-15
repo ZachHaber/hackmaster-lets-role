@@ -93,7 +93,7 @@ export type UniversalSheetData = {
   // [componentId: string]: ComponentValue;
 };
 
-interface SkillRepeater {
+export interface SkillEntry {
   skill: string;
   skillDisplay?: string;
   percent: number;
@@ -103,15 +103,21 @@ interface SkillRepeater {
   usedDisplay?: 'history';
 }
 
+export type SkillRepeaters = 'universal' | 'languages';
+
+export type SkillRepeater = { [entryId: string]: SkillEntry };
+
+// export interface
+
 export type MainSheetData = {
   skillDifficulty: string;
-  universal: { [entryId: string]: SkillRepeater };
   sortSkillsName: string;
   sortSkillsPercent: string;
   filterSkills: string;
   filterSkillsIcon: IconName;
 } & UniversalSheetData &
-  Record<Attributes, number | undefined>;
+  Record<Attributes, number | undefined> &
+  Record<SkillRepeaters, SkillRepeater>;
 
 export type MonsterSheetData = {} & UniversalSheetData;
 declare global {
@@ -316,7 +322,7 @@ export function ensureUniversalSkillsExist(sheet: MainSheet) {
   if (skillsToAdd) {
     // const universal = Object.fromEntries(
 
-    const skills = skillsToAdd.map<[string, SkillRepeater]>((skill) => {
+    const skills = skillsToAdd.map<[string, SkillEntry]>((skill) => {
       const stats = skill.stats.split(',') as Attributes[];
       const defaultPercent =
         Math.min.apply(
@@ -345,7 +351,7 @@ export function ensureUniversalSkillsExist(sheet: MainSheet) {
 }
 
 export function sortSkills(
-  skillsEntries: [entryId: string, entry: SkillRepeater][],
+  skillsEntries: [entryId: string, entry: SkillEntry][],
   property: 'label' | 'percentDisplay',
   dir: 'asc' | 'desc' = 'asc'
 ) {
@@ -357,8 +363,8 @@ export function sortSkills(
 }
 function compareSkill(
   table: Table<Skill>,
-  a: SkillRepeater,
-  b: SkillRepeater,
+  a: SkillEntry,
+  b: SkillEntry,
   property: 'label' | 'percentDisplay',
   dirMul: -1 | 1
 ): number {

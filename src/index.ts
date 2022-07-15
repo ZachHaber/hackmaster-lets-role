@@ -4,6 +4,8 @@ import {
   isMainSheet,
   MainSheetData,
   sheets,
+  SkillRepeater,
+  SkillRepeaters,
   sortSkills,
   upgradeSheet,
 } from './sheet';
@@ -192,55 +194,70 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
     filterSkills.value('');
   }
 
-  const repeater = sheet.get('universal');
+  const createSkillHandler = (repeaterId: 'universal' | 'languages') =>
+    function skillClickHandler(input: Component<string | undefined>) {
+      const entryId = input.index();
+      if (!entryId) {
+        // something went wrong
+        log(new Error('invalid entryId'));
+        return;
+      }
+      const data = sheet.getData();
+      const entryData = data[repeaterId][entryId];
+      if (!entryData) {
+        return log('could not find ' + entryId + ' in the repeater');
+      }
 
-  function skillClickHandler(input: Component<string | undefined>) {
-    const entryId = input.index();
-    if (!entryId) {
-      // something went wrong
-      log(new Error('invalid entryId'));
-      return;
-    }
-    const data = sheet.getData();
-    const entryData = data.universal[entryId];
-    if (!entryData) {
-      return log('could not find ' + entryId + ' in the repeater');
-    }
-
-    const { percent, skill: skillId, defaultPercent } = entryData;
-    const skill = Tables.get('skills').get(skillId);
-    if (!skill) {
-      log(`${skillId} not found`);
-      return;
-    }
-    const skillPercent = percent || defaultPercent || 0;
-    const diff = Tables.get('rolldiff').get(data.skillDifficulty);
-    const diffMod = parseInt(diff.value);
-    if (diff.id === 'competitive') {
-      // 1d100p!
-      const dice = Dice.create(
-        '(1d100 < 100? reroll(1d100,100): 100 + (1d20 < 20? reroll(1d20,20) : 20 + expl(1d6)))'
-      ).add(''.concat(skillPercent.toString(), '[skillPercent]'));
-      Dice.roll(
-        sheet,
-        dice,
-        ''.concat(skill.label, ' ', diff.label, ' Check'),
-        data.diceVisibility
-      );
-    } else {
-      const dice = Dice.create('1d100').add(diffMod).compare('<', skillPercent);
-      Dice.roll(
-        sheet,
-        dice,
-        ''.concat(skill.label, ' ', diff.label, ' Skill Check'),
-        data.diceVisibility
-      );
-    }
-  }
-  function updateRepeaterDisplay(
-    repeater: Component<MainSheetData['universal']>
-  ) {
+      const { percent, skill: skillId, defaultPercent } = entryData;
+      const skill: Skill =
+        repeaterId === 'languages'
+          ? {
+              label: `${skillId} Language`,
+              stats: 'int',
+              id: '',
+              section: undefined,
+            }
+          : Tables.get('skills').get(skillId);
+      if (!skill) {
+        log(`${skillId} not found`);
+        return;
+      }
+      const skillPercent = percent || defaultPercent || 0;
+      const diff = Tables.get('rolldiff').get(data.skillDifficulty);
+      const diffMod = parseInt(diff.value);
+      if (diff.id === 'default') {
+        // TODO, add a prompt to select the difficult
+        log('set difficulty');
+      } else if (diff.id === 'competitive') {
+        if (repeaterId === 'languages') {
+          return;
+        }
+        // 1d100p!
+        const dice = Dice.create(
+          '(1d100 < 100? reroll(1d100,100): 100 + (1d20 < 20? reroll(1d20,20) : 20 + expl(1d6)))'
+        ).add(`${skillPercent}[skillPercent]`);
+        Dice.roll(
+          sheet,
+          dice,
+          ''.concat(skill.label, ' ', diff.label, ' Check'),
+          data.diceVisibility
+        );
+      } else {
+        const dice = Dice.create('1d100')
+          .add(`${diffMod}[difficulty]`)
+          .compare('<', `${skillPercent}[skillPercent]`);
+        Dice.roll(
+          sheet,
+          dice,
+          ''.concat(skill.label, ' ', diff.label, ' Skill Check'),
+          data.diceVisibility
+        );
+      }
+    };
+  function updateRepeaterDisplay(repeaterId: SkillRepeaters) {
+    const repeater = sheet.get(repeaterId);
     const table = Tables.get('skills');
+    const skillClickHandler = createSkillHandler(repeaterId);
     each(repeater.value(), (item, entryId) => {
       const entryComponent = repeater.find(entryId as string);
       if (!entryComponent) {
@@ -257,30 +274,40 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
       const skillDisplay = entryComponent.find('skillDisplay');
       if (skillDisplay) {
         skillDisplay.on('click', skillClickHandler);
-        if (!item.skill) {
-          skillDisplay.text('N/A');
-          return;
-        } else {
-          const skill = table.get(item.skill);
-          if (skill.label !== item.skillDisplay) {
-            if (!skill) {
-              skillDisplay.text(`Skill ${item.skill} not found`);
-            } else {
-              skillDisplay.text(skill.label);
+        if (repeaterId === 'universal') {
+          // For the main skills list, we need to use
+          if (!item.skill) {
+            skillDisplay.text('N/A');
+            return;
+          } else {
+            const skill = table.get(item.skill);
+            if (skill.label !== item.skillDisplay) {
+              if (!skill) {
+                skillDisplay.text(`Skill ${item.skill} not found`);
+              } else {
+                skillDisplay.text(skill.label);
+              }
             }
           }
+        } else {
+          skillDisplay.text(item.skill);
         }
       }
     });
   }
-  updateRepeaterDisplay(repeater);
-  repeater.on('update', (repeater) => {
-    updateRepeaterDisplay(repeater);
+  const skillRepeaters: SkillRepeaters[] = ['universal', 'languages'];
+  skillRepeaters.forEach((repeaterId) => {
+    const repeater = sheet.get(repeaterId);
+    updateRepeaterDisplay(repeaterId);
+    repeater.on('update', () => {
+      updateRepeaterDisplay(repeaterId);
+    });
   });
+  const skillRepeater = sheet.get('universal');
   Tables.get('attributes').each((attribute) => {
     addEventListener(sheet, attribute.id, 'update', (event) => {
       const skillTable = Tables.get('skills');
-      const entries = Object.entries(repeater.value());
+      const entries = Object.entries(skillRepeater.value());
       const data = sheet.getData();
       let hasUpdate = false;
       const update = Object.fromEntries(
@@ -308,7 +335,7 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
         })
       );
       if (hasUpdate) {
-        repeater.value(update);
+        skillRepeater.value(update);
       }
     });
   });

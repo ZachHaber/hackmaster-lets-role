@@ -8,7 +8,7 @@ declare interface Attribute {
 declare interface Skill {
   id: string;
   label: string;
-  section: 'universal';
+  section?: 'universal';
   stats: string;
 }
 
@@ -33,8 +33,15 @@ declare interface Alignment {
 }
 
 declare interface SkillDifficulty {
-  id: string;
-  value: string;
+  id:
+    | 'default'
+    | 'diff_verydifficult'
+    | 'diff_difficult'
+    | 'diff_average'
+    | 'diff_easy'
+    | 'diff_trivial'
+    | 'competitive';
+  value: `${number}`;
   label: string;
 }
 
@@ -68,8 +75,12 @@ interface TableMap {
   skills: Table<Skill>;
 }
 
+declare type Keyof<T> = Extract<keyof T, string>;
+
+declare type ValueOf<T extends object> = T[Keyof<T>];
+
 declare interface Tables {
-  get<T extends keyof TableMap>(name: T): TableMap[T];
+  get<T extends keyof TableMap & string>(name: T): TableMap[T];
 }
 declare const Tables: Tables;
 
@@ -83,11 +94,9 @@ declare interface SheetData extends Record<string, ComponentValue> {
   uid: string;
 }
 
-declare interface SheetSetup {
-  fakeSheet: {};
-}
+declare interface SheetSetup {}
 
-declare type SheetTypes = keyof SheetSetup;
+declare type SheetTypes = Keyof<SheetSetup>;
 
 declare type GetSheetType<TypedSheet extends Sheet<any>> = ReturnType<
   TypedSheet['id']
@@ -95,12 +104,12 @@ declare type GetSheetType<TypedSheet extends Sheet<any>> = ReturnType<
 
 declare interface SheetMap {}
 
-declare type Sheets = SheetMap[keyof SheetMap];
+declare type Sheets = ValueOf<SheetMap>;
 
 declare class Sheet<ST extends SheetTypes> {
   private constructor();
   /** Get a component by its id */
-  get<T extends keyof SheetSetup[ST]>(is: T): Component<SheetSetup[ST][T]>;
+  get<T extends Keyof<SheetSetup[ST]>>(is: T): Component<SheetSetup[ST][T]>;
   get<T extends ComponentValue>(id: string): Component<T> | null;
   /** Get a variable's value by its id */
   getVariable(id: string): string | number | null;
@@ -181,7 +190,7 @@ declare class Component<T = ComponentValue> {
    *
    * Get a child component.
    */
-  find<SubPath extends keyof T>(id: SubPath): Component<T[SubPath]> | null;
+  find<SubPath extends Keyof<T>>(id: SubPath): Component<T[SubPath]> | null;
 
   /**
    *
@@ -646,7 +655,7 @@ declare function each<T>(
 ): void;
 declare function each<T extends object>(
   collection: T,
-  iterator: (item: T[keyof T], key: keyof T) => void | false
+  iterator: (item: ValueOf<T>, key: Keyof<T>) => void | false
 ): void;
 declare function each<T>(
   collection: Table<T>,
