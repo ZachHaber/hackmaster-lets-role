@@ -99,6 +99,8 @@ interface SkillRepeater {
   percent: number;
   percentDisplay?: string;
   defaultPercent?: number;
+  used: boolean;
+  usedDisplay?: 'history';
 }
 
 export type MainSheetData = {
@@ -327,6 +329,7 @@ export function ensureUniversalSkillsExist(sheet: MainSheet) {
           percent: 0,
           skill: skill.id,
           defaultPercent,
+          used: false,
         },
       ];
     });

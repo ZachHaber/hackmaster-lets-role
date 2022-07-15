@@ -246,22 +246,29 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
       if (!entryComponent) {
         return;
       }
-
-      entryComponent.find('skillDisplay')?.on('click', skillClickHandler);
-      const skillDisplay = entryComponent?.find('skillDisplay');
-      if (!skillDisplay) {
-        return;
-      }
-      if (!item.skill) {
-        skillDisplay.text('N/A');
-        return;
-      }
-      const skill = table.get(item.skill);
-      if (skill.label !== item.skillDisplay) {
-        if (!skill) {
-          skillDisplay.text(`Skill ${item.skill} not found`);
+      const usedDisplay = entryComponent.find('usedDisplay');
+      if (usedDisplay) {
+        if (item.used) {
+          usedDisplay.removeClass('invisible');
         } else {
-          skillDisplay.text(skill.label);
+          usedDisplay.addClass('invisible');
+        }
+      }
+      const skillDisplay = entryComponent.find('skillDisplay');
+      if (skillDisplay) {
+        skillDisplay.on('click', skillClickHandler);
+        if (!item.skill) {
+          skillDisplay.text('N/A');
+          return;
+        } else {
+          const skill = table.get(item.skill);
+          if (skill.label !== item.skillDisplay) {
+            if (!skill) {
+              skillDisplay.text(`Skill ${item.skill} not found`);
+            } else {
+              skillDisplay.text(skill.label);
+            }
+          }
         }
       }
     });
@@ -305,48 +312,6 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
       }
     });
   });
-
-  // Tables.get('skills').each((skill) => {
-  //   sheet.get(skill.id)?.on('click', function () {
-  //     const data = sheet.getData();
-  //     let pct = sheet.get<number>(''.concat(skill.id, '_pct'))?.value() || 0;
-  //     if (skill.section === 'universal') {
-  //       const trained = data[`${skill.id}_isTrained`];
-  //       if (!trained) {
-  //         const stats = skill.stats.split(',') as Attributes[];
-  //         pct =
-  //           Math.min.apply(
-  //             undefined,
-  //             stats.map((statId) => data[statId] || 0)
-  //           ) || 0;
-  //       }
-  //     } else if (pct === 0) {
-  //       return;
-  //     }
-  //     const diff = Tables.get('rolldiff').get(data.skillDifficulty);
-  //     const diffMod = parseInt(diff.value);
-  //     if (diff.id === 'competitive') {
-  //       // 1d100p!
-  //       const dice = Dice.create(
-  //         '(1d100 < 100? reroll(1d100,100): 100 + (1d20 < 20? reroll(1d20,20) : 20 + expl(1d6)))'
-  //       ).add(''.concat(pct.toString(), '[skillPercent]'));
-  //       Dice.roll(
-  //         sheet,
-  //         dice,
-  //         ''.concat(skill.label, ' ', diff.label, ' Check'),
-  //         data.diceVisibility
-  //       );
-  //     } else {
-  //       const dice = Dice.create('1d100').add(diffMod).compare('<', pct);
-  //       Dice.roll(
-  //         sheet,
-  //         dice,
-  //         ''.concat(skill.label, ' ', diff.label, ' Skill Check'),
-  //         data.diceVisibility
-  //       );
-  //     }
-  //   });
-  // });
 };
 
 //endregion
