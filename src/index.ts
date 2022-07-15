@@ -1,3 +1,4 @@
+import { addEventListener } from './listeners';
 import {
   ensureUniversalSkillsExist,
   isMainSheet,
@@ -9,8 +10,6 @@ import {
 // write your custom scripts here
 
 // import { tableToArray, toMap } from './utils';
-
-// const attributes = tableToArray(Tables.get('attribute_list'));
 
 // const attributesMap = toMap(attributes, 'id');
 //region STANDARD LET'S ROLE FUNCTIONS: these are pre-created as blank by Let's Role, customize each to enable script at different events
@@ -270,6 +269,41 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
   updateRepeaterDisplay(repeater);
   repeater.on('update', (repeater) => {
     updateRepeaterDisplay(repeater);
+  });
+  Tables.get('attributes').each((attribute) => {
+    addEventListener(sheet, attribute.id, 'update', (event) => {
+      const skillTable = Tables.get('skills');
+      const entries = Object.entries(repeater.value());
+      const data = sheet.getData();
+      let hasUpdate = false;
+      const update = Object.fromEntries(
+        entries.map((entry) => {
+          const skill = skillTable.get(entry[1].skill);
+          if (
+            !skill ||
+            skill.section !== 'universal' ||
+            event.target.value() == entry[1].defaultPercent ||
+            !skill.stats.includes(event.target.id())
+          ) {
+            return entry;
+          }
+          const stats = skill.stats.split(',') as Attributes[];
+          const defaultPercent =
+            Math.min.apply(
+              undefined,
+              stats.map((statId) => data[statId] || 0)
+            ) || 0;
+          if (defaultPercent === entry[1].defaultPercent) {
+            return entry;
+          }
+          hasUpdate = true;
+          return [entry[0], { ...entry[1], defaultPercent }];
+        })
+      );
+      if (hasUpdate) {
+        repeater.value(update);
+      }
+    });
   });
 
   // Tables.get('skills').each((skill) => {

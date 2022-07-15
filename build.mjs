@@ -46,9 +46,19 @@ async function transpileBuild({ outputFiles }) {
         configFile: true,
         filename: path.basename(filePath),
       });
-      await fs.writeFile(filePath, res.code, {
-        flag: 'w',
-      });
+      await fs.writeFile(
+        filePath,
+        res.code
+          // TODO: move this transform into babel to make it less brittle
+          // stupid inability to use optional arguments...
+          .replace(
+            `function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); Object.defineProperty(Constructor, "prototype", { writable: false }); return Constructor; }`,
+            `function _createClass(Constructor) { if (arguments[1]) _defineProperties(Constructor.prototype, arguments[1]); if (arguments[2]) _defineProperties(Constructor, arguments[2]); Object.defineProperty(Constructor, "prototype", { writable: false }); return Constructor; }`
+          ),
+        {
+          flag: 'w',
+        }
+      );
     } else {
       // don't run css through babel
       await fs.writeFile(filePath, raw, { flag: 'w' });

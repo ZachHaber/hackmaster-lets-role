@@ -1,4 +1,5 @@
 import type { IconName } from '@fortawesome/fontawesome-common-types';
+import { addEventListener } from './listeners';
 import { isObject, length, tableToArray } from './utils';
 
 export enum sheets {
@@ -279,7 +280,7 @@ const cleanRepeater = function (
     // let originalData = sheet.get(repeater).value();
 
     //Clearing repeater as many times as half its number of entries to avoid the bug that doubles some entries after updating values
-    let numberOfClears = numClears || length(data);
+    let numberOfClears = numClears || Math.ceil(length(data) / 2);
     for (let i = 1; i <= numberOfClears; i++) {
       sheet.setData({ [repeater]: {} });
     }

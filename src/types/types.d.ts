@@ -61,7 +61,7 @@ interface TableMap {
   myTabs: Table<unknown>;
   skillstabs: Table<unknown>;
   rolldiff: Table<SkillDifficulty>;
-  attribute_list: Table<Attribute>;
+  attributes: Table<Attribute>;
   damage_type: Table<DamageType>;
   init_select: Table<Init>;
   size_choice: Table<Size>;
@@ -83,7 +83,9 @@ declare interface SheetData extends Record<string, ComponentValue> {
   uid: string;
 }
 
-declare interface SheetSetup {}
+declare interface SheetSetup {
+  fakeSheet: {};
+}
 
 declare type SheetTypes = keyof SheetSetup;
 
