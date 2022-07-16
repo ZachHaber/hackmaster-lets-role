@@ -1,6 +1,5 @@
 import type { IconName } from '@fortawesome/fontawesome-common-types';
-import { addEventListener } from './listeners';
-import { isObject, length, tableToArray } from './utils';
+import { debug, debugFunc, isObject, length, tableToArray } from './utils';
 
 export enum sheets {
   main = 'main',
@@ -24,7 +23,13 @@ export function isMonsterSheet(sheet: Sheets): sheet is MonsterSheet {
   return sheet.id() === sheets.monster;
 }
 
-type ModifyIds<ST extends SheetTypes> = { [id: string]: keyof SheetSetup[ST] };
+type ModifyIds<ST extends SheetTypes> = Record<
+  string,
+  Keyof<SheetSetup[ST]> | string
+>;
+//  {
+//   [id: string]: Keyof<SheetSetup[ST]> | string;
+// };
 
 interface Update<ST extends SheetTypes> {
   /**
@@ -48,7 +53,7 @@ interface Update<ST extends SheetTypes> {
 }
 
 function getVersionTransformations<Sheet extends Sheets>(
-  curSheet: Sheet,
+  sheet: Sheet,
   version: number
 ): Update<GetSheetType<Sheet>> {
   const updates: Update<GetSheetType<Sheet>> = {
@@ -62,25 +67,31 @@ function getVersionTransformations<Sheet extends Sheets>(
     // for changes that need to be made to all sheets at a particular version (mainly first init)
     case 0:
       {
-        updates.updates.uid = convertIdToString(curSheet.getSheetId());
+        updates.updates.uid = convertIdToString(sheet.getSheetId());
       }
       break;
   }
 
-  if (isMainSheet(curSheet)) {
-    const sheet: MainSheet = curSheet;
+  if (isMainSheet(sheet)) {
+    const mainUpdates: Update<GetSheetType<typeof sheet>> =
+      updates as unknown as Update<GetSheetType<typeof sheet>>;
     switch (version) {
       case 0: {
+        // Set all attributes to a base 10
+        Tables.get('attributes').each((attribute) => {
+          mainUpdates.updates[attribute.id] = 10;
+          mainUpdates.updates[`${attribute.id}Frac`] = 10;
+        });
+        break;
       }
     }
-  } else if (isMonsterSheet(curSheet)) {
-    const sheet: MonsterSheet = curSheet;
+  } else if (isMonsterSheet(sheet)) {
     switch (version) {
       case 0: {
       }
     }
   } else {
-    assertUnreachable(curSheet);
+    assertUnreachable(sheet);
   }
 
   return updates;
@@ -103,7 +114,7 @@ export interface SkillEntry {
   usedDisplay?: 'history';
 }
 
-export type SkillRepeaters = 'universal' | 'languages';
+export type SkillRepeaters = 'skills' | 'languages';
 
 export type SkillRepeater = { [entryId: string]: SkillEntry };
 
@@ -115,8 +126,19 @@ export type MainSheetData = {
   sortSkillsPercent: string;
   filterSkills: string;
   filterSkillsIcon: IconName;
+
+  characterLevel: number;
+  characterName: string;
+  characterRace: string;
+  characterClass: string;
+
+  /**
+   * A fake "magical" entry that populates into the character selector
+   */
+  race: string;
 } & UniversalSheetData &
   Record<Attributes, number | undefined> &
+  Record<`${Attributes}Frac`, number | undefined> &
   Record<SkillRepeaters, SkillRepeater>;
 
 export type MonsterSheetData = {} & UniversalSheetData;
@@ -199,22 +221,25 @@ export function applyUpdates<Sheet extends Sheets>(
 
 function getModificationUpdates<Sheet extends Sheets>(
   sheet: Sheet,
-  modifiedComponentIds: Record<string, keyof SheetSetup[GetSheetType<Sheet>]>
+  modifiedComponentIds: ModifyIds<GetSheetType<Sheet>>
 ): Partial<SheetSetup[GetSheetType<Sheet>]> {
   const data = sheet.getData();
   const modifyUpdates: Partial<SheetSetup[GetSheetType<Sheet>]> = {};
   each(modifiedComponentIds, (newId, oldId) => {
-    // const B : ST = 'main';
-    const oldIdCast = oldId as unknown as keyof UniversalSheetData;
     // cast oldId to pretend to be an actual ID, because there's no guarantee we are keeping it around
-    if (data[oldIdCast] != null) {
-      // Clear out old data to save space
-      // See if we can set it to undefined to fully remove the data.
-      modifyUpdates[oldIdCast as keyof SheetSetup[GetSheetType<Sheet>]] =
-        undefined;
-      // If there's old data, transfer it to the new property
-      modifyUpdates[newId] = data[oldIdCast] as any;
+    const oldIdCast = oldId as unknown as keyof UniversalSheetData;
+    if (!data.hasOwnProperty(oldId) || !data[oldIdCast]) {
+      // Skip this if it doesn't exist in the data currently or it's empty
+      return;
     }
+    // Clear out old data to save space...
+    // let's role won't save if you try to set `null` or `undefined`
+    // so `''` is likely the smallest data that can actually be used.
+    modifyUpdates[oldIdCast] = '' as any;
+    // If there's old data, transfer it to the new property
+    modifyUpdates[newId as Keyof<typeof modifyUpdates>] = data[
+      oldIdCast
+    ] as any;
   });
 
   return modifyUpdates;
@@ -288,7 +313,7 @@ const cleanRepeater = function (
     // let originalData = sheet.get(repeater).value();
 
     //Clearing repeater as many times as half its number of entries to avoid the bug that doubles some entries after updating values
-    let numberOfClears = numClears || Math.ceil(length(data) / 2);
+    let numberOfClears = numClears || 2; //Math.ceil(length(data) / 2);
     for (let i = 1; i <= numberOfClears; i++) {
       sheet.setData({ [repeater]: {} });
     }
@@ -303,12 +328,13 @@ function assertUnreachable(_x: never): never {
 }
 
 export function ensureUniversalSkillsExist(sheet: MainSheet) {
+  debug('initializing universal skills');
   const skillTable = Tables.get('skills');
   const skills = tableToArray(skillTable);
   const universalSkills = skills.filter(
     (skill) => skill.section === 'universal'
   );
-  const repeater = sheet.get('universal');
+  const repeater = sheet.get('skills');
   const entries = repeater.value();
   let allValues = Object.entries(entries || {});
   const extantSkills = Object.fromEntries(
@@ -319,9 +345,10 @@ export function ensureUniversalSkillsExist(sheet: MainSheet) {
   );
   const data = sheet.getData();
 
-  if (skillsToAdd) {
-    // const universal = Object.fromEntries(
-
+  if (skillsToAdd.length) {
+    debugFunc(
+      () => `Adding skills ${skillsToAdd.map((skill) => skill.id).join(', ')}`
+    );
     const skills = skillsToAdd.map<[string, SkillEntry]>((skill) => {
       const stats = skill.stats.split(',') as Attributes[];
       const defaultPercent =
@@ -342,11 +369,7 @@ export function ensureUniversalSkillsExist(sheet: MainSheet) {
     repeater.value(
       Object.fromEntries(sortSkills(skills.concat(allValues), 'label'))
     );
-
-    // );
-    // repeater.value(universal);
-
-    cleanRepeater(sheet, 'universal');
+    cleanRepeater(sheet, 'skills');
   }
 }
 

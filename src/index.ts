@@ -1,29 +1,30 @@
-import { addEventListener } from './listeners';
+import { addEventListener, ComponentEvent } from './listeners';
 import {
   ensureUniversalSkillsExist,
   isMainSheet,
+  MainSheet,
   MainSheetData,
   sheets,
-  SkillRepeater,
   SkillRepeaters,
   sortSkills,
   upgradeSheet,
 } from './sheet';
+import { debug, debugFunc } from './utils';
 // write your custom scripts here
 
 // import { tableToArray, toMap } from './utils';
 
 // const attributesMap = toMap(attributes, 'id');
-//region STANDARD LET'S ROLE FUNCTIONS: these are pre-created as blank by Let's Role, customize each to enable script at different events
+//#region STANDARD LET'S ROLE FUNCTIONS: these are pre-created as blank by Let's Role, customize each to enable script at different events
 
 init = function (sheet) {
   // [triggered when any character sheet, craft, or dice roll is first displayed] This includes entries in the dice log.
   Bindings.clear(sheet.id()); // clear any remaining bindings in the item to avoid any unplanned messages at initialization
+  debug('Start Upgrading sheet');
+  debugFunc(() => sheet.getData());
   upgradeSheet(sheet);
   if (isMainSheet(sheet)) {
-    const main: Sheet<sheets.main> = sheet;
-    // if item is a character sheet (currently, no code executed for any other type of item)
-    log('Start initializing sheet');
+    log('Start initializing main sheet');
     //log("Transferring data from old to new ids for components for which the id was changed");
     // //log("Initializing sheet ID");
     // //log("Sheet's ID is " + sheet.getData().uid);
@@ -32,8 +33,9 @@ init = function (sheet) {
     // //initAttributes(sheet);
 
     // log('Initializing "race" string for Character Manager label');
-    // // initRaceLabel(sheet);
-    initSkills(main);
+    initRaceLabel(sheet);
+    initSkills(sheet);
+    debugFunc(() => sheet.getData());
     // let values = sheet.getData().diceVisibility;
     // log(values)
     // log("Finished initializing sheet. Have fun!");
@@ -82,42 +84,48 @@ getBarAttributes = function (sheet) {
   if ([sheets.main, sheets.monster].includes(sheet.id())) {
     // limits the code to the cases where it's a character being dropped onto the scene, as opposed to a craft for example.
     stats[_('Health')] = ['hp', 'hpmax'];
-    return stats;
   }
-  return {};
+  return stats;
 };
-//endregion
+//#endregion
 
-//region SHEET INITIALIZATION FUNCTIONS: initialize every element of the sheet, tab by tab, to update dependent fields when modified and trigger rolls when clicked
+//#region SHEET INITIALIZATION FUNCTIONS: initialize every element of the sheet, tab by tab, to update dependent fields when modified and trigger rolls when clicked
 
-const initRaceLabel = function (sheet: Sheets) {
-  // [called in init] calculates the 'race' id component to pass info into the character manager, it's just neat fancy sparkles <3
-  // const updateRaceLabel = function () {
-  //     let fakeRaceLabel = '';
-  //     let addSpace = Boolean(sheet.get('character_lvl').value()) && Boolean(sheet.get('character_race').value() && sheet.get('character_race').value() != 'default');
-  //     if (sheet.get('character_lvl').value())
-  //         fakeRaceLabel += _("Lvl") + " " + sheet.get('character_lvl').value()
-  //     if (addSpace)
-  //         fakeRaceLabel += " ";
-  //     if (sheet.get('character_race').value() && sheet.get('character_race').value() != 'default')
-  //         fakeRaceLabel += _(Tables.get("Races").get(sheet.get("character_race").value()).label);
-  //     if (sheet.get('race').value() != fakeRaceLabel)
-  //         sheet.get('race').value(fakeRaceLabel);
-  // };
-  // updateRaceLabel();
-  // sheet.get('character_lvl').on('update', function () {
-  //     updateRaceLabel();
-  // })
-  // sheet.get('character_race').on('update', function () {
-  //     updateRaceLabel();
-  // })
+const initRaceLabel = function (sheet: MainSheet) {
+  // [called in init] calculates the 'race' id component to pass info into the character manager
+
+  const updateRaceLabel = function () {
+    const data = sheet.getData();
+
+    const entries: string[] = [];
+    if (data.characterLevel) {
+      entries.push(`${_('lvl')} ${data.characterLevel}`);
+    }
+    if (data.characterRace || 'default' !== 'default') {
+      const race = Tables.get('Races').get(data.characterRace).value;
+      entries.push(_(race));
+    }
+    const raceLabel = entries.join(' ');
+    if (data.race !== raceLabel) {
+      sheet.get('race').value(raceLabel);
+    }
+  };
+  updateRaceLabel();
+  addEventListener(sheet, 'characterLevel', 'update', (event) => {
+    updateRaceLabel();
+  });
+  addEventListener(sheet, 'characterRace', 'update', (event) => {
+    updateRaceLabel();
+  });
 };
 
 const initSkills = function (sheet: Sheet<sheets.main>) {
+  debug(`init skills`);
   ensureUniversalSkillsExist(sheet);
   type SortId = 'sortSkillsName' | 'sortSkillsPercent';
   const sortIds: SortId[] = ['sortSkillsName', 'sortSkillsPercent'];
-  function sortHandler(ev: Component<string>) {
+  function sortHandler(ev: ComponentEvent<string>) {
+    const component = ev.target;
     const sorts: Record<
       SortId,
       { states: string[]; property: 'label' | 'percentDisplay'; other: SortId }
@@ -133,44 +141,47 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
         other: 'sortSkillsPercent',
       },
     };
-    const repeater = sheet.get('universal');
+    const repeater = sheet.get('skills');
     const skills = Object.entries(repeater.value());
     const dirs = ['asc', 'desc'] as const;
-    const { states, property, other } = sorts[ev.id() as SortId];
-    const index = (states.indexOf(ev.value()) + 1) % states.length;
+    const { states, property, other } = sorts[component.id() as SortId];
+    const index = (states.indexOf(component.value()) + 1) % states.length;
     const update: Partial<MainSheetData> = {
-      universal: Object.fromEntries(sortSkills(skills, property, dirs[index])),
+      skills: Object.fromEntries(sortSkills(skills, property, dirs[index])),
     };
 
-    update[ev.id() as unknown as SortId] = states[index];
+    update[component.id() as unknown as SortId] = states[index];
     update[other] = sorts[other].states[1];
+    debug('setting data in sortHandler');
     sheet.setData(update);
   }
   sortIds.forEach((id) => {
-    sheet.get(id).on('click', sortHandler);
+    addEventListener(sheet, id, 'click', sortHandler);
   });
 
   function clearFilterSkills() {
-    sheet.setData({ filterSkills: '' });
+    const filterSkills = sheet.get('filterSkills');
+    if (filterSkills.value()) {
+      filterSkills.value('');
+    }
   }
+  addEventListener(sheet, 'filterSkillsIcon', 'click', clearFilterSkills);
 
-  sheet.get('filterSkills').on('update', function (event) {
-    const search = event.value().toLocaleLowerCase();
+  addEventListener(sheet, 'filterSkills', 'update', function (event) {
+    const search = event.target.value().toLocaleLowerCase();
     const filterSkillsIcon = sheet.get('filterSkillsIcon');
-    filterSkillsIcon.value(search ? 'times' : 'search');
-    filterSkillsIcon[search ? 'addClass' : 'removeClass']('clickable');
-    if (search) {
-      filterSkillsIcon.on('click', clearFilterSkills);
-    } else {
-      filterSkillsIcon.off('click');
+    const newIcon = search ? 'times' : 'search';
+    if (filterSkillsIcon.value() !== newIcon) {
+      filterSkillsIcon.value(newIcon);
+      filterSkillsIcon[search ? 'addClass' : 'removeClass']('clickable');
     }
 
-    const repeater = sheet.get('universal');
+    const repeater = sheet.get('skills');
     const table = Tables.get('skills');
     each(repeater.value(), (entry, entryId) => {
       const skill = table.get(entry.skill);
       if (!skill) {
-        log(`${entry.skill} does not exist in the table!`);
+        debug(`${entry.skill} does not exist in the table!`);
         return;
       }
       const entryComponent = repeater.find(entryId as string);
@@ -189,24 +200,22 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
       }
     });
   });
-  const filterSkills = sheet.get('filterSkills');
-  if (filterSkills.value()) {
-    filterSkills.value('');
-  }
+  clearFilterSkills();
 
-  const createSkillHandler = (repeaterId: 'universal' | 'languages') =>
+  const createSkillHandler = (repeaterId: SkillRepeaters) =>
     function skillClickHandler(input: Component<string | undefined>) {
       const entryId = input.index();
       if (!entryId) {
         // something went wrong
-        log(new Error('invalid entryId'));
+        debug(new Error('invalid entryId'));
         return;
       }
       const data = sheet.getData();
       const entryData = data[repeaterId][entryId];
       if (!entryData) {
-        return log('could not find ' + entryId + ' in the repeater');
+        return debug('could not find ' + entryId + ' in the repeater');
       }
+      debug(entryData);
 
       const { percent, skill: skillId, defaultPercent } = entryData;
       const skill: Skill =
@@ -219,15 +228,17 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
             }
           : Tables.get('skills').get(skillId);
       if (!skill) {
-        log(`${skillId} not found`);
+        debug(`${skillId} not found`);
         return;
       }
       const skillPercent = percent || defaultPercent || 0;
-      const diff = Tables.get('rolldiff').get(data.skillDifficulty);
+      const diff = Tables.get('rolldiff').get(
+        data.skillDifficulty || 'default'
+      );
       const diffMod = parseInt(diff.value);
       if (diff.id === 'default') {
         // TODO, add a prompt to select the difficult
-        log('set difficulty');
+        log('No difficulty Selected');
       } else if (diff.id === 'competitive') {
         if (repeaterId === 'languages') {
           return;
@@ -274,7 +285,7 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
       const skillDisplay = entryComponent.find('skillDisplay');
       if (skillDisplay) {
         skillDisplay.on('click', skillClickHandler);
-        if (repeaterId === 'universal') {
+        if (repeaterId === 'skills') {
           // For the main skills list, we need to use
           if (!item.skill) {
             skillDisplay.text('N/A');
@@ -295,7 +306,7 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
       }
     });
   }
-  const skillRepeaters: SkillRepeaters[] = ['universal', 'languages'];
+  const skillRepeaters: SkillRepeaters[] = ['skills', 'languages'];
   skillRepeaters.forEach((repeaterId) => {
     const repeater = sheet.get(repeaterId);
     updateRepeaterDisplay(repeaterId);
@@ -303,7 +314,7 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
       updateRepeaterDisplay(repeaterId);
     });
   });
-  const skillRepeater = sheet.get('universal');
+  const skillRepeater = sheet.get('skills');
   Tables.get('attributes').each((attribute) => {
     addEventListener(sheet, attribute.id, 'update', (event) => {
       const skillTable = Tables.get('skills');
@@ -341,4 +352,4 @@ const initSkills = function (sheet: Sheet<sheets.main>) {
   });
 };
 
-//endregion
+//#endregion

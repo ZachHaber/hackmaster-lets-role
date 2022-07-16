@@ -616,7 +616,7 @@ declare type DiceResult = DiceResultChild & BaseTopDiceResult;
 
 // Utilities
 /** Log variables to the console */
-declare function log(...data: any[]): void;
+declare function log(data: any): void;
 
 /**
  * Call a function after a wait time

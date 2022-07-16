@@ -43,3 +43,55 @@ export function ensureArray<T>(val: T | T[]): T[] {
 export function isObject(value: any): value is object {
   return value && typeof value === 'object' && !Array.isArray(value);
 }
+
+// export function deepClone<T>(value: T[]):T[]
+export function deepClone<T>(value: T): T {
+  if (!value) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return Array.from<any>(value as unknown as any).map(
+      (val) => deepClone(val as any) as any
+    ) as any;
+  } else if (typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map((entry) => [entry[0], deepClone(entry[1])])
+    ) as any;
+  }
+  return value;
+}
+
+const IS_DEBUG = false;
+
+export function debug(data: any) {
+  // Only log if IS_DEBUG is set.
+  if (!IS_DEBUG) {
+    return;
+  }
+  if (typeof data === 'object' && data !== null) {
+    log(data);
+  } else {
+    log(`[debug]: ${data}`);
+  }
+}
+export function debugFunc(data: () => any) {
+  // Only log if IS_DEBUG is set.
+  if (!IS_DEBUG) {
+    return;
+  }
+  if (typeof data !== 'function') {
+    return;
+  }
+  debugDeep(data());
+}
+export function debugDeep(data: any) {
+  // Only log if IS_DEBUG is set.
+  if (!IS_DEBUG) {
+    return;
+  }
+  if (typeof data === 'object' && data !== null) {
+    log(deepClone(data));
+  } else {
+    log(`[debug]: ${data}`);
+  }
+}

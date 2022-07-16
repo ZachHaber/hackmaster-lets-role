@@ -1,4 +1,5 @@
 import { AbortSignal, Emitter, Event } from './utility/abortcontroller';
+import { debug } from './utils';
 
 export type ComponentEvent<C extends ComponentValue> = Event & {
   target: Component<C>;
@@ -36,6 +37,11 @@ export function addEventListener<
     element.on(type as EventType, (component) => {
       const event = new Event(type) as ComponentEvent<ComponentValue>;
       event.target = component;
+      debug(
+        `dispatching ${sheetId}->${elementId}:${event.type} to ${
+          eventHandlers[sheetId][elementId].listeners[event.type]?.length
+        } items`
+      );
       eventHandlers[sheetId][elementId].dispatchEvent(event);
     });
   };
