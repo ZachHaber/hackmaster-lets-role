@@ -2,13 +2,17 @@ import { addEventListener, ComponentEvent } from './listeners';
 import {
   ensureUniversalSkillsExist,
   isMainSheet,
-  MainSheet,
-  MainSheetData,
-  sheets,
-  SkillRepeaters,
   sortSkills,
   upgradeSheet,
 } from './sheet';
+import {
+  sheets,
+  MainSheet,
+  MainSheetData,
+  SkillRepeaters,
+  Skill,
+  Attributes,
+} from './types/systemTypes';
 import { debug, debugFunc } from './utils';
 // write your custom scripts here
 

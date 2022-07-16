@@ -1,10 +1,14 @@
-import type { IconName } from '@fortawesome/fontawesome-common-types';
+import {
+  Attributes,
+  MainSheet,
+  MonsterSheet,
+  sheets,
+  Skill,
+  SkillEntry,
+  UniversalSheetData,
+} from './types/systemTypes';
 import { debug, debugFunc, isObject, length, tableToArray } from './utils';
 
-export enum sheets {
-  main = 'main',
-  monster = 'monster',
-}
 export const ID_PREFIX = 'ID_';
 
 // Used to set up sheets via versions.
@@ -12,9 +16,6 @@ export const versions: Record<sheets, number> = {
   main: 1,
   monster: 1,
 };
-
-export type MainSheet = Sheet<sheets.main>;
-export type MonsterSheet = Sheet<sheets.monster>;
 
 export function isMainSheet(sheet: Sheets): sheet is MainSheet {
   return sheet.id() === sheets.main;
@@ -95,63 +96,6 @@ function getVersionTransformations<Sheet extends Sheets>(
   }
 
   return updates;
-}
-
-export type UniversalSheetData = {
-  uid: string;
-  version: number;
-  diceVisibility: DiceVisibility;
-  // [componentId: string]: ComponentValue;
-};
-
-export interface SkillEntry {
-  skill: string;
-  skillDisplay?: string;
-  percent: number;
-  percentDisplay?: string;
-  defaultPercent?: number;
-  used: boolean;
-  usedDisplay?: 'history';
-}
-
-export type SkillRepeaters = 'skills' | 'languages';
-
-export type SkillRepeater = { [entryId: string]: SkillEntry };
-
-// export interface
-
-export type MainSheetData = {
-  skillDifficulty: string;
-  sortSkillsName: string;
-  sortSkillsPercent: string;
-  filterSkills: string;
-  filterSkillsIcon: IconName;
-
-  characterLevel: number;
-  characterName: string;
-  characterRace: string;
-  characterClass: string;
-
-  /**
-   * A fake "magical" entry that populates into the character selector
-   */
-  race: string;
-} & UniversalSheetData &
-  Record<Attributes, number | undefined> &
-  Record<`${Attributes}Frac`, number | undefined> &
-  Record<SkillRepeaters, SkillRepeater>;
-
-export type MonsterSheetData = {} & UniversalSheetData;
-declare global {
-  interface SheetSetup {
-    [sheets.main]: MainSheetData;
-    [sheets.monster]: MonsterSheetData;
-  }
-
-  interface SheetMap {
-    [sheets.main]: Sheet<sheets.main>;
-    [sheets.monster]: Sheet<sheets.monster>;
-  }
 }
 
 export function upgradeSheet(sheet: Sheets) {
